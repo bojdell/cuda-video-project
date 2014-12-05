@@ -20,7 +20,7 @@ static void pgm_save(unsigned char *buf, int wrap, int xsize, int ysize, char *f
 
 
 int main(int argc, char **argv) {
-	const char *filename = "input_videos/foreman.mpeg";
+	const char *filename = "input_videos/foreman.mpg";
 	const char *outfilename = "output/test%d.pgm";
 	avcodec_register_all();
 

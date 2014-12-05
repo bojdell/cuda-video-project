@@ -1,0 +1,5 @@
+to break first 20 frames of video into into ppm files:
+ffmpeg -i input_videos/foreman.mpg -vframes 20 pics/baby%03d.ppm
+
+to combine ppm files into mp4:
+ffmpeg -framerate 24 -i outfiles/baby%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p outfilter.mp4
