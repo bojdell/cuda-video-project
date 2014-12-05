@@ -169,12 +169,17 @@ void filterPPM(PPMImage *img, Filter f)
             img->data[img_y * img->y + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
             img->data[img_y * img->y + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
 
-            if(!print) {
+            if(print < 30) {
                 printf("img: %d, %d, %d\n", img->data[img_y * img->y + img_x].red, img->data[img_y * img->y + img_x].green, img->data[img_y * img->y + img_x].blue);
-                print = 1;
+                print++;
             }
         }
     }
+}
+
+void freeImage(PPMImage * image) {
+    free(image->data);
+    free(image);
 }
 
 // ppm <stride_len> (<max_frames>)
@@ -243,6 +248,8 @@ int main(int argc, char *argv[]){
             sprintf(outstr, "outfiles/baby%03d.ppm", i*stride_len + j + 1);
             writePPM(outstr, &images[j]);
         }
+        
+        freeImage(&image[j]);
     }
 
     printf("%f seconds spent\n", time_spent[numChunks - 1]);
