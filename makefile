@@ -25,21 +25,29 @@ CC=gcc
 CFLAGS=-c -Wall -I/usr/local/include/libavcodec -I/usr/local/include/libavformat
 INCLUDES:=$(shell pkg-config --cflags libavformat libavcodec libswscale libavutil libavfilter)
 LDFLAGS:=$(shell pkg-config --libs libavformat libavcodec libswscale libavutil libavfilter) -lm
-all: serial_test libav_test
 
-serial_test: serial_test.o
-	$(CC) serial_test.o $(LDFLAGS) -o serial_test
-
-serial_test.o: serial_test.c
-	$(CC) $(CFLAGS) serial_test.c $(INCLUDES)
-
-
-libav_test: libav_test.o
-	$(CC) libav_test.o $(LDFLAGS) -o libav_test
+NVCC        = nvcc
+NVCC_FLAGS  = -O3
+LD_FLAGS    = -lcudart 
+EXE	        = ppm
+OBJ	        = ppm.o
 
 
-libav_test.o: libav_test.c
-	$(CC) $(CFLAGS) libav_test.c $(INCLUDES)
+default: $(EXE) ppmTmp
+
+
+ppmTmp: ppmTmp.o
+	$(CC) ppmTmp.o $(LDFLAGS) -o ppmTmp
+
+ppmTmp.o: ppmTmp.c
+	$(CC) $(CFLAGS) ppmTmp.c $(INCLUDES)
+
+
+ppm.o: ppm.cu ppmKernel.cu 
+	$(NVCC) -c -o $@ ppm.cu $(NVCC_FLAGS)
+
+$(EXE): $(OBJ)
+	$(NVCC) $(OBJ) -o $(EXE) $(LD_FLAGS)
 
 clean:
-	rm -rf *o serial_test
+	rm -rf *.o $(EXE)
