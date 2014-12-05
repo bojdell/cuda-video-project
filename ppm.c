@@ -11,7 +11,12 @@ typedef struct {
      PPMPixel *data;
 } PPMImage;
 
-#define CREATOR "RPFELGUEIRAS"
+typedef struct {
+     int x, y;
+     int *data;
+} Filter;
+
+#define CREATOR "DA BROS"
 #define RGB_COMPONENT_COLOR 255
 
 static PPMImage *readPPM(const char *filename)
@@ -25,6 +30,7 @@ static PPMImage *readPPM(const char *filename)
          if (!fp) {
               fprintf(stderr, "Unable to open file '%s'\n", filename);
               exit(1);
+            // return NULL;
          }
 
          //read image format
@@ -96,8 +102,8 @@ void writePPM(const char *filename, PPMImage *img)
     //open file for output
     fp = fopen(filename, "wb");
     if (!fp) {
-         fprintf(stderr, "Unable to open file '%s'\n", filename);
-         exit(1);
+        fprintf(stderr, "Unable to open file '%s'\n", filename);
+        exit(1);
     }
 
     //write the header file
@@ -118,7 +124,8 @@ void writePPM(const char *filename, PPMImage *img)
     fclose(fp);
 }
 
-void changeColorPPM(PPMImage *img)
+// process a single PPM image
+void processPPM(PPMImage *img)
 {
     int i;
     if(img){
@@ -139,39 +146,61 @@ void changeColorPPM(PPMImage *img)
     }
 }
 
-int main(){
-
-    clock_t begin, end;
-    double time_spent;
-
-    
-    /* here, do your time-consuming job */
+// ppm <stride_len> (<max_frames>)
+int main(int argc, char *argv[]){
+    if ( argc < 2 ) /* argc should be at least 2 for correct execution */
+    {
+        /* We print argv[0] assuming it is the program name */
+        printf("usage: %s <stride_len> (<max_frames>)\n", argv[0]);
+        return -1;
+    }
 
     char instr[80];
     char outstr[80];
-    int i = 0;
+    int i = 0, j = 0;
+    int numFrames = 301;
+    int stride_len = atoi(argv[1]);
+    int numChunks = numFrames / stride_len;
+    if(numFrames % stride_len) numChunks++;
 
-    PPMImage images[301];
+    clock_t begin, end;
+    double time_spent[numChunks + 1];   // time spent for each chunk, plus accumulate total at end
+    time_spent[numChunks - 1] = 0;      // init accumulator to 0
 
-    for(i = 0; i < 301; i++) {
-        sprintf(instr, "infiles/filename%03d.ppm", i+1);
-        images[i] = *readPPM(instr);
+    PPMImage images[stride_len];
+
+    // loop over all frames, in chunks of stride_len
+    for(i = 0; i < numChunks; i ++) {
+
+        // read 1 chunk of stride_len frames into images[]
+        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+            sprintf(instr, "infiles/baby%03d.ppm", i*stride_len + j + 1);
+            images[j] = *readPPM(instr);
+            // if(&images[j] == NULL) {
+            //     printf("All files processed\n");
+            //     return 0;
+            // }
+        }
+        
+        begin = clock();
+
+        // process chunk of frames in images[]
+        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+            processPPM(&images[j]);
+        }
+        
+        end = clock();
+        time_spent[i] = (double)(end - begin) / CLOCKS_PER_SEC;
+        time_spent[numChunks - 1] += time_spent[i];
+
+        // write 1 chunk of stride_len frames from images[]
+        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+            sprintf(outstr, "outfiles/baby%03d.ppm", i*stride_len + j + 1);
+            writePPM(outstr, &images[j]);
+        }
     }
 
-    begin = clock();
-    for(i = 1; i <= 301; i++) {
-        sprintf(instr, "infiles/filename%03d.ppm", i);
-        sprintf(outstr, "outfiles/baby%03d.ppm", i);
+    printf("%f seconds spent\n", time_spent[numChunks - 1]);
 
-        PPMImage *image;
-        //image = readPPM(instr);
-        changeColorPPM(&images[i-1]);
-        //writePPM(outstr,image);
-    }
-
-    end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-
-    printf("%f seconds spent\n", time_spent);
-    
+    return 0;
 }
