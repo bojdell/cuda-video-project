@@ -23,6 +23,11 @@ typedef struct {
 #define CREATOR "DA BROS"
 #define RGB_COMPONENT_COLOR 255
 
+void freeImage(PPMImage * image) {
+    free(image->data);
+    free(image);
+}
+
 static PPMImage *readPPM(const char *filename)
 {
          char buff[16];
@@ -87,7 +92,7 @@ static PPMImage *readPPM(const char *filename)
     //memory allocation for pixel data
     img->data = (PPMPixel*)malloc(img->x * img->y * sizeof(PPMPixel));
 
-    if (!img) {
+    if (!img->data) {
          fprintf(stderr, "Unable to allocate memory\n");
          exit(1);
     }
@@ -131,21 +136,32 @@ void writePPM(const char *filename, PPMImage *img)
 }
 
 // filter a single PPM image
-void filterPPM(PPMImage *img, Filter f)
+void filterPPM(PPMImage **image, Filter f)
 {
-    if(!img)
+    if(!image || !*image)
         return;
 
     int img_x, img_y;
     int f_x, f_y;
     int pixel_x, pixel_y;
+    PPMImage * img = *image;
+    PPMImage * result;
 
     // allocate memory for new image
     result = (PPMImage *)malloc(sizeof(PPMImage));
-    if (!img) {
+    if (!result) {
          fprintf(stderr, "Unable to allocate memory\n");
          exit(1);
     }
+
+    result->data = (PPMPixel*)malloc(img->x * img->y * sizeof(PPMPixel));
+    if (!result->data) {
+         fprintf(stderr, "Unable to allocate memory\n");
+         exit(1);
+    }
+
+    result->x = img->x;
+    result->y = img->y;
 
     // loop over all pixels in image
     for(img_x = 0; img_x < img->x; img_x++) {
@@ -170,16 +186,14 @@ void filterPPM(PPMImage *img, Filter f)
             }
 
             // apply filter factor and bias, and write resultant pixel back to img
-            img->data[img_y * img->y + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
-            img->data[img_y * img->y + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
-            img->data[img_y * img->y + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
+            result->data[img_y * img->y + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
+            result->data[img_y * img->y + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
+            result->data[img_y * img->y + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
         }
     }
-}
 
-void freeImage(PPMImage * image) {
-    free(image->data);
-    free(image);
+    freeImage(img);
+    image = &result;
 }
 
 // ppm <stride_len> (<max_frames>)
@@ -203,7 +217,7 @@ int main(int argc, char *argv[]){
     double time_spent[numChunks + 1];   // time spent for each chunk, plus accumulate total at end
     time_spent[numChunks - 1] = 0;      // init accumulator to 0
 
-    PPMImage images[stride_len];
+    PPMImage * images[stride_len];
     Filter blur = {
         .x = 5,
         .y = 5,
@@ -229,7 +243,7 @@ int main(int argc, char *argv[]){
                 printf("All files processed\n");
                 return 0;
             }
-            images[j] = *img;
+            images[j] = img;
         }
         
         begin = clock();
@@ -246,10 +260,12 @@ int main(int argc, char *argv[]){
         // write 1 chunk of stride_len frames from images[]
         for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
             sprintf(outstr, "outfiles/baby%03d.ppm", i*stride_len + j + 1);
-            writePPM(outstr, &images[j]);
+            writePPM(outstr, images[j]);
         }
         
-        freeImage(&image[j]);
+        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+            freeImage(images[j]);
+        }
     }
 
     printf("%f seconds spent\n", time_spent[numChunks - 1]);
