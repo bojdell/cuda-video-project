@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 
 typedef struct {
      unsigned char red,green,blue;
@@ -11,9 +12,12 @@ typedef struct {
      PPMPixel *data;
 } PPMImage;
 
+// Filter struct. See http://lodev.org/cgtutor/filtering.html for more info
 typedef struct {
      int x, y;
-     int *data;
+     double data[25];
+     double factor;
+     double bias;
 } Filter;
 
 #define CREATOR "DA BROS"
@@ -55,8 +59,9 @@ static PPMImage *readPPM(const char *filename)
     //check for comments
     c = getc(fp);
     while (c == '#') {
-    while (getc(fp) != '\n') ;
-         c = getc(fp);
+        while (getc(fp) != '\n')
+            ;
+        c = getc(fp);
     }
 
     ungetc(c, fp);
@@ -96,6 +101,7 @@ static PPMImage *readPPM(const char *filename)
     fclose(fp);
     return img;
 }
+
 void writePPM(const char *filename, PPMImage *img)
 {
     FILE *fp;
@@ -124,25 +130,50 @@ void writePPM(const char *filename, PPMImage *img)
     fclose(fp);
 }
 
-// process a single PPM image
-void processPPM(PPMImage *img)
+int print = 0;
+// filter a single PPM image
+void filterPPM(PPMImage *img, Filter f)
 {
-    int i;
-    if(img){
+    if(!img)
+        return;
 
-         for(i=0;i<img->x*img->y;i++){
-              int avg = (img->data[i].red + img->data[i].green + img ->data[i].blue) / 3;
+    int img_x, img_y;
+    int f_x, f_y;
+    int pixel_x, pixel_y;
 
-              /*
-              img->data[i].red=RGB_COMPONENT_COLOR-img->data[i].red;
-              img->data[i].green=RGB_COMPONENT_COLOR-img->data[i].green;
-              img->data[i].blue=RGB_COMPONENT_COLOR-img->data[i].blue;
-              */
+    // loop over all pixels in image
+    for(img_x = 0; img_x < img->x; img_x++) {
+        for(img_y = 0; img_y < img->y; img_y++) {
+            // accumulate red, green, and blue vals for this pixel
+            int red = 0, green = 0, blue = 0;
+            
+            // loop over surrounding pixels
+            for(f_x = 0; f_x < f.x; f_x++) {
+                for(f_y = 0; f_y < f.y; f_y++) {
+                    // get absolute locations of surrounding pixels
+                    pixel_x = img_x + (f_x - f.x / 2);
+                    pixel_y = img_y + (f_y - f.y / 2);
 
-              img->data[i].red = avg;
-              img->data[i].green = avg;
-              img->data[i].blue = avg;
-         }
+                    // check to make sure pixel_x and pixel_y are valid coordinates
+                    if(pixel_x >= 0 && pixel_x < img->x && pixel_y >= 0 && pixel_y < img->y) {
+                        red += img->data[pixel_y * img->y + pixel_x].red * f.data[f_y * f.x + f_x];
+                        green += img->data[pixel_y * img->y + pixel_x].green * f.data[f_y * f.x + f_x];
+                        blue += img->data[pixel_y * img->y + pixel_x].blue * f.data[f_y * f.x + f_x];
+                    }
+                }
+            }
+
+            
+            // apply filter factor and bias, and write resultant pixel back to img
+            img->data[img_y * img->y + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
+            img->data[img_y * img->y + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
+            img->data[img_y * img->y + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
+
+            if(!print) {
+                printf("img: %d, %d, %d\n", img->data[img_y * img->y + img_x].red, img->data[img_y * img->y + img_x].green, img->data[img_y * img->y + img_x].blue);
+                print = 1;
+            }
+        }
     }
 }
 
@@ -168,6 +199,19 @@ int main(int argc, char *argv[]){
     time_spent[numChunks - 1] = 0;      // init accumulator to 0
 
     PPMImage images[stride_len];
+    Filter blur = {
+        .x = 5,
+        .y = 5,
+        .data = {
+            0, 0, 1, 0, 0,
+            0, 1, 1, 1, 0,
+            1, 1, 1, 1, 1,
+            0, 1, 1, 1, 0,
+            0, 0, 1, 0, 0
+        },
+        .factor = 0.25,
+        .bias = 0
+    };
 
     // loop over all frames, in chunks of stride_len
     for(i = 0; i < numChunks; i ++) {
@@ -187,7 +231,7 @@ int main(int argc, char *argv[]){
 
         // process chunk of frames in images[]
         for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
-            processPPM(&images[j]);
+            filterPPM(&images[j], blur);
         }
         
         end = clock();
