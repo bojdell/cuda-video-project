@@ -141,6 +141,13 @@ void filterPPM(PPMImage *img, Filter f)
     int f_x, f_y;
     int pixel_x, pixel_y;
 
+    // allocate memory for new image
+    result = (PPMImage *)malloc(sizeof(PPMImage));
+    if (!img) {
+         fprintf(stderr, "Unable to allocate memory\n");
+         exit(1);
+    }
+
     // loop over all pixels in image
     for(img_x = 0; img_x < img->x; img_x++) {
         for(img_y = 0; img_y < img->y; img_y++) {
@@ -163,7 +170,6 @@ void filterPPM(PPMImage *img, Filter f)
                 }
             }
 
-            
             // apply filter factor and bias, and write resultant pixel back to img
             img->data[img_y * img->y + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
             img->data[img_y * img->y + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
@@ -177,6 +183,7 @@ void filterPPM(PPMImage *img, Filter f)
     }
 }
 
+int print2 = 0;
 // ppm <stride_len> (<max_frames>)
 int main(int argc, char *argv[]){
     if ( argc < 2 ) /* argc should be at least 2 for correct execution */
@@ -232,6 +239,10 @@ int main(int argc, char *argv[]){
         // process chunk of frames in images[]
         for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
             filterPPM(&images[j], blur);
+            if(!print2) {
+                printf("img: %d, %d, %d\n", images[j].data[0].red, images[j].data[0].green, images[j].data[0].blue);
+                print2 = 1;
+            }
         }
         
         end = clock();
