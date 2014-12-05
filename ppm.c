@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 
 typedef struct {
      unsigned char red,green,blue;
@@ -11,8 +12,21 @@ typedef struct {
      PPMPixel *data;
 } PPMImage;
 
-#define CREATOR "RPFELGUEIRAS"
+// Filter struct. See http://lodev.org/cgtutor/filtering.html for more info
+typedef struct {
+     int x, y;
+     double data[25];
+     double factor;
+     double bias;
+} Filter;
+
+#define CREATOR "DA BROS"
 #define RGB_COMPONENT_COLOR 255
+
+void freeImage(PPMImage * image) {
+    free(image->data);
+    free(image);
+}
 
 static PPMImage *readPPM(const char *filename)
 {
@@ -23,8 +37,9 @@ static PPMImage *readPPM(const char *filename)
          //open PPM file for reading
          fp = fopen(filename, "rb");
          if (!fp) {
-              fprintf(stderr, "Unable to open file '%s'\n", filename);
-              exit(1);
+              // fprintf(stderr, "Hey! Unable to open file '%s'\n", filename);
+              // exit(1);
+            return NULL;
          }
 
          //read image format
@@ -49,8 +64,9 @@ static PPMImage *readPPM(const char *filename)
     //check for comments
     c = getc(fp);
     while (c == '#') {
-    while (getc(fp) != '\n') ;
-         c = getc(fp);
+        while (getc(fp) != '\n')
+            ;
+        c = getc(fp);
     }
 
     ungetc(c, fp);
@@ -76,7 +92,7 @@ static PPMImage *readPPM(const char *filename)
     //memory allocation for pixel data
     img->data = (PPMPixel*)malloc(img->x * img->y * sizeof(PPMPixel));
 
-    if (!img) {
+    if (!img->data) {
          fprintf(stderr, "Unable to allocate memory\n");
          exit(1);
     }
@@ -90,14 +106,15 @@ static PPMImage *readPPM(const char *filename)
     fclose(fp);
     return img;
 }
+
 void writePPM(const char *filename, PPMImage *img)
 {
     FILE *fp;
     //open file for output
     fp = fopen(filename, "wb");
     if (!fp) {
-         fprintf(stderr, "Unable to open file '%s'\n", filename);
-         exit(1);
+        fprintf(stderr, "Unable to open file '%s'\n", filename);
+        exit(1);
     }
 
     //write the header file
@@ -118,60 +135,140 @@ void writePPM(const char *filename, PPMImage *img)
     fclose(fp);
 }
 
-void changeColorPPM(PPMImage *img)
+// filter a single PPM image
+void filterPPM(PPMImage **image, Filter f)
 {
-    int i;
-    if(img){
+    if(!image || !*image)
+        return;
 
-         for(i=0;i<img->x*img->y;i++){
-              int avg = (img->data[i].red + img->data[i].green + img ->data[i].blue) / 3;
+    int img_x, img_y;
+    int f_x, f_y;
+    int pixel_x, pixel_y;
+    PPMImage * img = *image;
+    PPMImage * result;
 
-              /*
-              img->data[i].red=RGB_COMPONENT_COLOR-img->data[i].red;
-              img->data[i].green=RGB_COMPONENT_COLOR-img->data[i].green;
-              img->data[i].blue=RGB_COMPONENT_COLOR-img->data[i].blue;
-              */
-
-              img->data[i].red = avg;
-              img->data[i].green = avg;
-              img->data[i].blue = avg;
-         }
+    // allocate memory for new image
+    result = (PPMImage *)malloc(sizeof(PPMImage));
+    if (!result) {
+         fprintf(stderr, "Unable to allocate memory\n");
+         exit(1);
     }
+
+    result->data = (PPMPixel*)malloc(img->x * img->y * sizeof(PPMPixel));
+    if (!result->data) {
+         fprintf(stderr, "Unable to allocate memory\n");
+         exit(1);
+    }
+
+    result->x = img->x;
+    result->y = img->y;
+
+    // loop over all pixels in image
+    for(img_x = 0; img_x < img->x; img_x++) {
+        for(img_y = 0; img_y < img->y; img_y++) {
+            // accumulate red, green, and blue vals for this pixel
+            int red = 0, green = 0, blue = 0;
+            
+            // loop over surrounding pixels
+            for(f_x = 0; f_x < f.x; f_x++) {
+                for(f_y = 0; f_y < f.y; f_y++) {
+                    // get absolute locations of surrounding pixels
+                    pixel_x = img_x + (f_x - f.x / 2);
+                    pixel_y = img_y + (f_y - f.y / 2);
+
+                    // check to make sure pixel_x and pixel_y are valid coordinates
+                    if(pixel_x >= 0 && pixel_x < img->x && pixel_y >= 0 && pixel_y < img->y) {
+                        red += img->data[pixel_y * img->y + pixel_x].red * f.data[f_y * f.x + f_x];
+                        green += img->data[pixel_y * img->y + pixel_x].green * f.data[f_y * f.x + f_x];
+                        blue += img->data[pixel_y * img->y + pixel_x].blue * f.data[f_y * f.x + f_x];
+                    }
+                }
+            }
+
+            // apply filter factor and bias, and write resultant pixel back to img
+            result->data[img_y * img->y + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
+            result->data[img_y * img->y + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
+            result->data[img_y * img->y + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
+        }
+    }
+
+    freeImage(img);
+    image = &result;
 }
 
-int main(){
-
-    clock_t begin, end;
-    double time_spent;
-
-    
-    /* here, do your time-consuming job */
+// ppm <stride_len> (<max_frames>)
+int main(int argc, char *argv[]){
+    if ( argc < 2 ) /* argc should be at least 2 for correct execution */
+    {
+        /* We print argv[0] assuming it is the program name */
+        printf("usage: %s <stride_len> (<max_frames>)\n", argv[0]);
+        return -1;
+    }
 
     char instr[80];
     char outstr[80];
-    int i = 0;
+    int i = 0, j = 0;
+    int numFrames = 301;
+    int stride_len = atoi(argv[1]);
+    int numChunks = numFrames / stride_len;
+    if(numFrames % stride_len) numChunks++;
 
-    PPMImage images[301];
+    clock_t begin, end;
+    double time_spent[numChunks + 1];   // time spent for each chunk, plus accumulate total at end
+    time_spent[numChunks - 1] = 0;      // init accumulator to 0
 
-    for(i = 0; i < 301; i++) {
-        sprintf(instr, "infiles/filename%03d.ppm", i+1);
-        images[i] = *readPPM(instr);
+    PPMImage * images[stride_len];
+    Filter blur = {
+        .x = 5,
+        .y = 5,
+        .data = {
+            0, 0, 1, 0, 0,
+            0, 1, 1, 1, 0,
+            1, 1, 1, 1, 1,
+            0, 1, 1, 1, 0,
+            0, 0, 1, 0, 0
+        },
+        .factor = 0.25,
+        .bias = 0
+    };
+
+    // loop over all frames, in chunks of stride_len
+    for(i = 0; i < numChunks; i ++) {
+
+        // read 1 chunk of stride_len frames into images[]
+        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+            sprintf(instr, "infiles/baby%03d.ppm", i*stride_len + j + 1);
+            PPMImage * img = readPPM(instr);
+            if(img == NULL) {
+                printf("All files processed\n");
+                return 0;
+            }
+            images[j] = img;
+        }
+        
+        begin = clock();
+
+        // process chunk of frames in images[]
+        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+            filterPPM(&images[j], blur);
+        }
+        
+        end = clock();
+        time_spent[i] = (double)(end - begin) / CLOCKS_PER_SEC;
+        time_spent[numChunks - 1] += time_spent[i];
+
+        // write 1 chunk of stride_len frames from images[]
+        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+            sprintf(outstr, "outfiles/baby%03d.ppm", i*stride_len + j + 1);
+            writePPM(outstr, images[j]);
+        }
+        
+        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+            freeImage(images[j]);
+        }
     }
 
-    begin = clock();
-    for(i = 1; i <= 301; i++) {
-        sprintf(instr, "infiles/filename%03d.ppm", i);
-        sprintf(outstr, "outfiles/baby%03d.ppm", i);
+    printf("%f seconds spent\n", time_spent[numChunks - 1]);
 
-        PPMImage *image;
-        //image = readPPM(instr);
-        changeColorPPM(&images[i-1]);
-        //writePPM(outstr,image);
-    }
-
-    end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-
-    printf("%f seconds spent\n", time_spent);
-    
+    return 0;
 }
