@@ -130,7 +130,6 @@ void writePPM(const char *filename, PPMImage *img)
     fclose(fp);
 }
 
-int print = 0;
 // filter a single PPM image
 void filterPPM(PPMImage *img, Filter f)
 {
@@ -174,16 +173,15 @@ void filterPPM(PPMImage *img, Filter f)
             img->data[img_y * img->y + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
             img->data[img_y * img->y + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
             img->data[img_y * img->y + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
-
-            if(!print) {
-                printf("img: %d, %d, %d\n", img->data[img_y * img->y + img_x].red, img->data[img_y * img->y + img_x].green, img->data[img_y * img->y + img_x].blue);
-                print = 1;
-            }
         }
     }
 }
 
-int print2 = 0;
+void freeImage(PPMImage * image) {
+    free(image->data);
+    free(image);
+}
+
 // ppm <stride_len> (<max_frames>)
 int main(int argc, char *argv[]){
     if ( argc < 2 ) /* argc should be at least 2 for correct execution */
@@ -239,10 +237,6 @@ int main(int argc, char *argv[]){
         // process chunk of frames in images[]
         for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
             filterPPM(&images[j], blur);
-            if(!print2) {
-                printf("img: %d, %d, %d\n", images[j].data[0].red, images[j].data[0].green, images[j].data[0].blue);
-                print2 = 1;
-            }
         }
         
         end = clock();
@@ -254,6 +248,8 @@ int main(int argc, char *argv[]){
             sprintf(outstr, "outfiles/baby%03d.ppm", i*stride_len + j + 1);
             writePPM(outstr, &images[j]);
         }
+        
+        freeImage(&image[j]);
     }
 
     printf("%f seconds spent\n", time_spent[numChunks - 1]);
