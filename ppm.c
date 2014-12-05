@@ -28,9 +28,9 @@ static PPMImage *readPPM(const char *filename)
          //open PPM file for reading
          fp = fopen(filename, "rb");
          if (!fp) {
-              fprintf(stderr, "Unable to open file '%s'\n", filename);
-              exit(1);
-            // return NULL;
+              // fprintf(stderr, "Hey! Unable to open file '%s'\n", filename);
+              // exit(1);
+            return NULL;
          }
 
          //read image format
@@ -175,11 +175,12 @@ int main(int argc, char *argv[]){
         // read 1 chunk of stride_len frames into images[]
         for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
             sprintf(instr, "infiles/baby%03d.ppm", i*stride_len + j + 1);
-            images[j] = *readPPM(instr);
-            // if(&images[j] == NULL) {
-            //     printf("All files processed\n");
-            //     return 0;
-            // }
+            PPMImage * img = readPPM(instr);
+            if(img == NULL) {
+                printf("All files processed\n");
+                return 0;
+            }
+            images[j] = *img;
         }
         
         begin = clock();
