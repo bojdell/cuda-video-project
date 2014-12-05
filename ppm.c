@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 typedef struct {
      unsigned char red,green,blue;
@@ -130,7 +131,7 @@ void changeColorPPM(PPMImage *img)
               img->data[i].green=RGB_COMPONENT_COLOR-img->data[i].green;
               img->data[i].blue=RGB_COMPONENT_COLOR-img->data[i].blue;
               */
-              
+
               img->data[i].red = avg;
               img->data[i].green = avg;
               img->data[i].blue = avg;
@@ -139,20 +140,38 @@ void changeColorPPM(PPMImage *img)
 }
 
 int main(){
+
+    clock_t begin, end;
+    double time_spent;
+
+    
+    /* here, do your time-consuming job */
+
     char instr[80];
     char outstr[80];
     int i = 0;
 
-    for(i = 1; i <= 20; i++) {
-        sprintf(instr, "pics/baby%03d.ppm", i);
+    PPMImage images[301];
+
+    for(i = 0; i < 301; i++) {
+        sprintf(instr, "infiles/filename%03d.ppm", i+1);
+        images[i] = *readPPM(instr);
+    }
+
+    begin = clock();
+    for(i = 1; i <= 301; i++) {
+        sprintf(instr, "infiles/filename%03d.ppm", i);
         sprintf(outstr, "outfiles/baby%03d.ppm", i);
 
         PPMImage *image;
-        image = readPPM(instr);
-        changeColorPPM(image);
-        writePPM(outstr,image);
-        printf("Press any key...");
-        getchar();  
+        //image = readPPM(instr);
+        changeColorPPM(&images[i-1]);
+        //writePPM(outstr,image);
     }
+
+    end = clock();
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+
+    printf("%f seconds spent\n", time_spent);
     
 }
