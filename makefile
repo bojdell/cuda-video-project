@@ -23,15 +23,23 @@
 
 CC=gcc
 CFLAGS=-c -Wall -I/usr/local/include/libavcodec -I/usr/local/include/libavformat
-INCLUDES:=$(shell pkg-config --cflags libavformat libavcodec libswscale libavutil)
-LDFLAGS:=$(shell pkg-config --libs libavformat libavcodec libswscale libavutil) -lm
-all: serial_test
+INCLUDES:=$(shell pkg-config --cflags libavformat libavcodec libswscale libavutil libavfilter)
+LDFLAGS:=$(shell pkg-config --libs libavformat libavcodec libswscale libavutil libavfilter) -lm
+all: serial_test libav_test
 
 serial_test: serial_test.o
 	$(CC) serial_test.o $(LDFLAGS) -o serial_test
 
 serial_test.o: serial_test.c
 	$(CC) $(CFLAGS) serial_test.c $(INCLUDES)
+
+
+libav_test: libav_test.o
+	$(CC) libav_test.o $(LDFLAGS) -o libav_test
+
+
+libav_test.o: libav_test.c
+	$(CC) $(CFLAGS) libav_test.c $(INCLUDES)
 
 clean:
 	rm -rf *o serial_test
