@@ -150,12 +150,30 @@ void changeColorPPM(PPMImage *img)
     }
 }
 
+Filter * initializeFilter()
+{
+    int data[FILTER_SIZE * FILTER_SIZE] = {0, 0, 0, 0, 0,
+                                           0, -1, -1, -1, 0,
+                                           0, -1, 8, -1, 0,
+                                           0, -1, -1, -1, 0,
+                                           0, 0, 0, 0, 0};
+    Filter * filter = (Filter*) malloc(sizeof(Filter));
+    filter->x = FILTER_SIZE;
+    filter->y = FILTER_SIZE;
+    for (int i = 0; i < FILTER_SIZE * FILTER_SIZE; i++)
+       filter->data[i] = data[i];
+    filter->factor = 1.0;
+    filter->bias =0;
+    return filter;
+}
+
 int main(){
+
 
     clock_t begin, end;
     double time_spent;
 
-    
+
     /* here, do your time-consuming job */
 
     char instr[80];
@@ -168,8 +186,9 @@ int main(){
     //     sprintf(instr, "infiles/baby001.ppm", i+1);
     //     images[i] = *readPPM(instr);
     // }
-    
+
     PPMPixel *imageData_d, *outputData_d, *outputData_h;
+    Filter * filter_h = initializeFilter();
 
     cudaError_t cuda_ret;
 
@@ -192,6 +211,9 @@ int main(){
     outImage->x = image->x;
     outImage->y = image->y;
 
+    cudaMemcpyToSymbol(filter_c, filter_h, sizeof(Filter));
+    cudaDeviceSynchronize();
+
 
     begin = clock();
 
@@ -203,18 +225,18 @@ int main(){
         cuda_ret = cudaMemcpy(imageData_d, image->data, image->x*image->y*sizeof(PPMPixel), cudaMemcpyHostToDevice);
         if(cuda_ret != cudaSuccess) FATAL("Unable to copy to device");
 
+        // Convolution
+        const unsigned int grid_x = (image->x - 1) / OUTPUT_TILE_SIZE + 1;
+        const unsigned int grid_y = (image->y -1) / OUTPUT_TILE_SIZE + 1;
+        dim3 dim_grid(grid_x, grid_y, 1);
+        dim3 dim_block(INPUT_TILE_SIZE, INPUT_TILE_SIZE, 1);
+        convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
 
-        dim3 dim_grid, dim_block;
-        dim_grid = dim3(image->y, 1,1);
-        dim_block = dim3(image->x, 1, 1);
-        // if(image->x % TILE_SIZE)
-        //     dim_grid.x++;
-
-        // if(image->y % TILE_SIZE)
-        //     dim_grid.y++;
-
-
-        blackAndWhite<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);        
+        // Black and white
+        //dim dim_grid, dim_block;
+        //dim_grid = dim3(image->y, 1,1);
+        //dim_block = dim3(image->x, 1, 1);
+        //blackAndWhite<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
 
         cuda_ret = cudaDeviceSynchronize();
         if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel");
@@ -254,5 +276,5 @@ int main(){
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 
     printf("%f seconds spent\n", time_spent);
-    
+
 }
