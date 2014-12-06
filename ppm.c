@@ -24,8 +24,11 @@ typedef struct {
 #define RGB_COMPONENT_COLOR 255
 
 void freeImage(PPMImage * image) {
-    free(image->data);
-    free(image);
+    if(image) {
+        if(image->data)
+            free(image->data);
+        free(image);
+    }
 }
 
 static PPMImage *readPPM(const char *filename)
@@ -178,17 +181,17 @@ void filterPPM(PPMImage **image, Filter f)
 
                     // check to make sure pixel_x and pixel_y are valid coordinates
                     if(pixel_x >= 0 && pixel_x < img->x && pixel_y >= 0 && pixel_y < img->y) {
-                        red += img->data[pixel_y * img->y + pixel_x].red * f.data[f_y * f.x + f_x];
-                        green += img->data[pixel_y * img->y + pixel_x].green * f.data[f_y * f.x + f_x];
-                        blue += img->data[pixel_y * img->y + pixel_x].blue * f.data[f_y * f.x + f_x];
+                        red += img->data[pixel_y * img->x + pixel_x].red * f.data[f_y * f.x + f_x];
+                        green += img->data[pixel_y * img->x + pixel_x].green * f.data[f_y * f.x + f_x];
+                        blue += img->data[pixel_y * img->x + pixel_x].blue * f.data[f_y * f.x + f_x];
                     }
                 }
             }
 
             // apply filter factor and bias, and write resultant pixel back to img
-            result->data[img_y * img->y + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
-            result->data[img_y * img->y + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
-            result->data[img_y * img->y + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
+            result->data[img_y * img->x + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
+            result->data[img_y * img->x + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
+            result->data[img_y * img->x + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
         }
     }
 
@@ -198,6 +201,7 @@ void filterPPM(PPMImage **image, Filter f)
 
 // ppm <stride_len> (<max_frames>)
 int main(int argc, char *argv[]){
+    printf("1");
     if ( argc < 2 ) /* argc should be at least 2 for correct execution */
     {
         /* We print argv[0] assuming it is the program name */
@@ -205,6 +209,7 @@ int main(int argc, char *argv[]){
         return -1;
     }
 
+    printf("2");
     char instr[80];
     char outstr[80];
     int i = 0, j = 0;
@@ -216,6 +221,9 @@ int main(int argc, char *argv[]){
     clock_t begin, end;
     double time_spent[numChunks + 1];   // time spent for each chunk, plus accumulate total at end
     time_spent[numChunks - 1] = 0;      // init accumulator to 0
+
+    printf("decl");
+
 
     PPMImage * images[stride_len];
     Filter blur = {
@@ -232,15 +240,33 @@ int main(int argc, char *argv[]){
         .bias = 0
     };
 
+
+    // PPMImage * images[stride_len];
+    // Filter nothing = {
+    //     .x = 5,
+    //     .y = 5,
+    //     .data = {
+    //         0, 0, 0, 0, 0,
+    //         0, 0, 0, 1, 0,
+    //         1, 1, 1, 1, 1,
+    //         0, 1, 1, 1, 0,
+    //         0, 0, 1, 0, 0
+    //     },
+    //     .factor = 0.25,
+    //     .bias = 0
+    // };
+
     // loop over all frames, in chunks of stride_len
     for(i = 0; i < numChunks; i ++) {
 
+        printf("chunk1");
         // read 1 chunk of stride_len frames into images[]
         for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
             sprintf(instr, "infiles/baby%03d.ppm", i*stride_len + j + 1);
             PPMImage * img = readPPM(instr);
             if(img == NULL) {
                 printf("All files processed\n");
+                printf("%f seconds spent\n", time_spent[numChunks - 1]);
                 return 0;
             }
             images[j] = img;
@@ -261,11 +287,13 @@ int main(int argc, char *argv[]){
         for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
             sprintf(outstr, "outfiles/baby%03d.ppm", i*stride_len + j + 1);
             writePPM(outstr, images[j]);
-        }
-        
-        for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
             freeImage(images[j]);
+            if(j > 5)exit(0);
         }
+
+        // for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
+        //     freeImage(images[j]);
+        // }
     }
 
     printf("%f seconds spent\n", time_spent[numChunks - 1]);
