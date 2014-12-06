@@ -264,6 +264,7 @@ int main(int argc, char *argv[]){
     }
 
     int stride_len = atoi(argv[1]);
+    int 
 
     clock_t begin, end;
     double time_spent;   // time spent for each chunk, plus accumulate total at end
