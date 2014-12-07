@@ -171,7 +171,7 @@ void loadFrames(PPMImage * frames, int z, int totalFrames)
         int fileNum = i + z + 1 - FILTER_SIZE / 2;
         if (fileNum <= totalFrames && fileNum > 0)
         {
-            sprintf(instr, "../infiles/tmp%03d.ppm", fileNum);
+            sprintf(instr, "infiles/tmp%03d.ppm", fileNum);
             frames[i] = *readPPM(instr);
         }
     }
@@ -218,7 +218,7 @@ void writeFrames(PPMImage * frames, int z, int totalFrames)
         int fileNum = i + z + 1;
         if (fileNum <= totalFrames)
         {
-            sprintf(outstr, "../outfiles/tmp%03d.ppm", fileNum);
+            sprintf(outstr, "outfiles/tmp%03d.ppm", fileNum);
             writePPM(outstr, &(frames[i]));
         }
     }
@@ -231,38 +231,36 @@ int main(int argc, char *argv[]){
       infile = argv[1];
 
       if (!system(NULL)) {exit (EXIT_FAILURE);}
-      system("exec rm -r ../infiles/*");
-      sprintf(ffmpegString, "ffmpeg -i ../input_videos/%s -f image2 -vf fps=fps=24 ../infiles/tmp%%03d.ppm", infile);
+      system("exec rm -r infiles/*");
+      sprintf(ffmpegString, "ffmpeg -i ../input_videos/%s -f image2 -vf fps=fps=24 infiles/tmp%%03d.ppm", infile);
       system (ffmpegString);
 
     }
-    system("exec rm -r ../outfiles/*");
+    system("exec rm -r -f outfiles/*");
 
     int totalFrames = 0;
     DIR * dirp;
     struct dirent * entry;
 
-    dirp = opendir("../infiles"); /* There should be error handling after this */
+    dirp = opendir("infiles"); /* There should be error handling after this */
     while ((entry = readdir(dirp)) != NULL) {
         if (entry->d_type == DT_REG) { /* If the entry is a regular file */
              totalFrames++;
         }
     }
+
     closedir(dirp);
     printf("%d\n", totalFrames);
 
     clock_t begin, end;
     double time_spent = 0.0;
 
-    char instr[80];
-    char outstr[80];
-
     PPMPixel *imageData_d, *outputData_d, *outputData_h, *inputData_h;
     Filter3D * filter_h = initializeFilter();
 
     cudaError_t cuda_ret;
 
-    PPMImage *image =  readPPM("../infiles/tmp001.ppm");
+    PPMImage *image =  readPPM("infiles/tmp001.ppm");
 
     inputData_h  = (PPMPixel *)malloc(INPUT_TILE_X * INPUT_TILE_Y * INPUT_TILE_Z * sizeof(PPMPixel));
     outputData_h = (PPMPixel *)malloc(OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel));
@@ -306,6 +304,7 @@ int main(int argc, char *argv[]){
             }
         }
         writeFrames(outputFrames, z, totalFrames);
+
     }
 
     free(inputData_h);
@@ -320,6 +319,6 @@ int main(int argc, char *argv[]){
     printf("%f seconds spent\n", time_spent);
 
     if (!system(NULL)) { exit (EXIT_FAILURE);}
-    sprintf(ffmpegString, "ffmpeg -framerate 24 -i ../outfiles/tmp%%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p ../outfilter.mp4");
+    sprintf(ffmpegString, "ffmpeg -framerate 24 -i outfiles/tmp%%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p outfilter.mp4");
     system (ffmpegString);
 }
