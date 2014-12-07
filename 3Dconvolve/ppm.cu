@@ -279,11 +279,6 @@ int main(int argc, char *argv[]){
     cuda_ret = cudaMalloc((void**)&(outputData_d), OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory");
 
-    /*PPMImage *outImage;
-    outImage = (PPMImage *)malloc(sizeof(PPMImage));
-    outImage->x = image->x;
-    outImage->y = image->y;*/
-
     cudaMemcpyToSymbol(filter_c, filter_h, sizeof(Filter3D));
     cudaDeviceSynchronize();
     dim3 dim_block(BLOCK_SIZE, BLOCK_SIZE, INPUT_TILE_Z);
@@ -291,6 +286,7 @@ int main(int argc, char *argv[]){
                   (INPUT_TILE_Y + 1) / BLOCK_SIZE + 1,
                   1);
 
+    begin = clock();
     for (int z = 0; z < totalFrames; z+=OUTPUT_TILE_Z)
     {
         loadFrames(inputFrames, z, totalFrames);
@@ -309,51 +305,21 @@ int main(int argc, char *argv[]){
         }
         writeFrames(outputFrames, z, totalFrames);
     }
+    end = clock();
 
-    /*for(i = 0; i < totalFrames-1; i++) {
-        sprintf(outstr, "../outfiles/tmp%03d.ppm", i+1);
-
-        image = &images[i];
-
-        cuda_ret = cudaMemcpy(imageData_d, image->data, image->x*image->y*sizeof(PPMPixel), cudaMemcpyHostToDevice);
-        if(cuda_ret != cudaSuccess) FATAL("Unable to copy to device");
-
-        // Convolution
-        const unsigned int grid_x = (image->x - 1) / OUTPUT_TILE_SIZE + 1;
-        const unsigned int grid_y = (image->y -1) / OUTPUT_TILE_SIZE + 1;
-        const unsigned int grid_z = (FRAME_DEPTH -1) / OUTPUT_TILE_SIZE + 1;
-        dim3 dim_grid(grid_x, grid_y, grid_z);
-        dim3 dim_block(INPUT_TILE_SIZE, INPUT_TILE_SIZE, INPUT_TILE_SIZE);
-
-        begin = clock();
-
-        convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y, FRAME_DEPTH);
-
-        end = clock();
-        time_spent += (double)(end - begin) / CLOCKS_PER_SEC;
-
-        cuda_ret = cudaDeviceSynchronize();
-        if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel");
-
-        cuda_ret = cudaMemcpy(outputData_h, outputData_d, image->x*image->y*sizeof(PPMPixel), cudaMemcpyDeviceToHost);
-        if(cuda_ret != cudaSuccess) FATAL("Unable to copy to host");
-
-
-        outImage->data = outputData_h;
-
-        writePPM(outstr,outImage);
-
-    }
-
+    free(inputData_h);
     free(outputData_h);
-    free(outImage);
+    for (int i = 0; i < INPUT_TILE_Z; i++)
+        free(inputFrames[i].data);
+    for (int i = 0; i < OUTPUT_TILE_Z; i++)
+        free(outputFrames[i].data);
     cudaFree(imageData_d);
-    cudaFree(outputData_d); */
+    cudaFree(outputData_d);
+
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("%f seconds spent\n", time_spent);
 
     if (!system(NULL)) { exit (EXIT_FAILURE);}
     sprintf(ffmpegString, "ffmpeg -framerate 24 -i ../outfiles/tmp%%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p ../outfilter.mp4");
     system (ffmpegString);
-
-    printf("%f seconds spent\n", time_spent);
-
 }
