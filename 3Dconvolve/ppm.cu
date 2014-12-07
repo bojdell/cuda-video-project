@@ -118,7 +118,7 @@ void writePPM(const char *filename, PPMImage *img)
 
 Filter3D * initializeFilter()
 {
-    int data[FILTER_SIZE][FILTER_SIZE][FILTER_SIZE] =  { { {0, 0, 0, 0, 0},
+    double data[FILTER_SIZE][FILTER_SIZE][FILTER_SIZE] =  { { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
@@ -155,8 +155,9 @@ Filter3D * initializeFilter()
     filter->z = FILTER_SIZE;
     for (int z = 0; z < FILTER_SIZE; z++)
         for (int y = 0; y < FILTER_SIZE; y++)
-            for (int x = 0; x < FILTER_SIZE; x++)
+            for (int x = 0; x < FILTER_SIZE; x++) {
                 (filter->data)[z][y][x] = data[z][y][x];
+            }
 
     filter->factor = 1.0;
     filter->bias =0;
@@ -177,7 +178,7 @@ void loadFrames(PPMImage * frames, int z, int totalFrames)
     }
 }
 
-void getPixels(PPMImage frames[], PPMPixel data[], int x, int y, int z, int width, int height, int depth)
+void getPixels(PPMImage frames[], PPMPixel *data, int x, int y, int z, int width, int height, int depth)
 {
     for (int k = 0; k < INPUT_TILE_Z; k++)
     {
@@ -265,13 +266,15 @@ int main(int argc, char *argv[]){
 
     PPMImage *image =  readPPM("../infiles/tmp001.ppm");
 
-
     inputData_h  = (PPMPixel *)malloc(INPUT_TILE_X * INPUT_TILE_Y * INPUT_TILE_Z * sizeof(PPMPixel));
     outputData_h = (PPMPixel *)malloc(OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel));
-    PPMImage inputFrames[OUTPUT_TILE_Z], outputFrames[OUTPUT_TILE_Z];
+    PPMImage inputFrames[INPUT_TILE_Z], outputFrames[OUTPUT_TILE_Z];
 
-    for (int i = 0; i < INPUT_TILE_Z; i++)
-            inputFrames[i].data = (PPMPixel *)malloc(image->x * image->y * sizeof(PPMPixel));
+    for (int i = 0; i < INPUT_TILE_Z; i++) {
+        inputFrames[i].x = image->x;
+        inputFrames[i].y = image->y;
+        inputFrames[i].data = (PPMPixel *)malloc(image->x * image->y * sizeof(PPMPixel));        
+    }
     for (int i = 0; i < OUTPUT_TILE_Z; i++) {
         outputFrames[i].x = image->x;
         outputFrames[i].y = image->y;
@@ -291,22 +294,17 @@ int main(int argc, char *argv[]){
                   (INPUT_TILE_Y + 1) / BLOCK_SIZE + 1,
                   1);
 
-    // printf("1\n");
     for (int z = 0; z < totalFrames; z+=OUTPUT_TILE_Z)
     {
-    // printf("2\n");
 
         loadFrames(inputFrames, z, totalFrames);
         for (int y = 0; y < image->y; y+=OUTPUT_TILE_Y)
         {
             for (int x = 0; x < image->x; x+=OUTPUT_TILE_X)
             {
-                // printf("%d, %d\n", y, x);
                 getPixels(inputFrames, inputData_h, x, y, z, image->x, image->y, totalFrames);
-                // printf("hi\n");
                 cudaMemcpy(imageData_d, inputData_h, INPUT_TILE_X * INPUT_TILE_Y * INPUT_TILE_Z * sizeof(PPMPixel),
                            cudaMemcpyHostToDevice);
-                // // printf("hi\n");
                 begin = clock();
                 convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d);
                 cuda_ret = cudaDeviceSynchronize();
