@@ -1,6 +1,6 @@
 #include "ppm.h"
 #include <math.h>
-
+#include <stdio.h>
 __constant__ Filter3D filter_c;
 
 __global__ void blackAndWhite(PPMPixel *imageData, PPMPixel *outputData, int width, int height) {
@@ -22,7 +22,6 @@ __global__ void blackAndWhite(PPMPixel *imageData, PPMPixel *outputData, int wid
 __global__ void convolution(PPMPixel *imageData, PPMPixel *outputData)
 {
     // __shared__ PPMPixel imageData_s[BLOCK_SIZE][BLOCK_SIZE][INPUT_TILE_Z];
-
     int tx = threadIdx.x;
     int ty = threadIdx.y;
     int tz = threadIdx.z;
@@ -49,9 +48,9 @@ __global__ void convolution(PPMPixel *imageData, PPMPixel *outputData)
     // // }
 
     // __syncthreads();
+    // printf("%d %d %d\n", row_o, col_o, depth_o);
 
     int red = 0, blue = 0, green = 0;
-
     if ( (FILTER_SIZE/2 <= col_i) && (col_i < INPUT_TILE_X - FILTER_SIZE /2) &&
          (FILTER_SIZE/2 <= row_i) && (row_i < INPUT_TILE_Y - FILTER_SIZE /2) &&
          (FILTER_SIZE/2 <= depth_i) && (depth_i < INPUT_TILE_Z - FILTER_SIZE /2) )
@@ -73,5 +72,6 @@ __global__ void convolution(PPMPixel *imageData, PPMPixel *outputData)
         outputData[depth_o * OUTPUT_TILE_X * OUTPUT_TILE_Y + row_o * OUTPUT_TILE_X + col_o].red   = min( max( (int)(filter_c.factor * red   + filter_c.bias), 0), 255);
         outputData[depth_o * OUTPUT_TILE_X * OUTPUT_TILE_Y + row_o * OUTPUT_TILE_X + col_o].blue  = min( max( (int)(filter_c.factor * blue  + filter_c.bias), 0), 255);
         outputData[depth_o * OUTPUT_TILE_X * OUTPUT_TILE_Y + row_o * OUTPUT_TILE_X + col_o].green = min( max( (int)(filter_c.factor * green + filter_c.bias), 0), 255);
+
     }
 }
