@@ -3,8 +3,10 @@ CFLAGS=-c -Wall
 LDFLAGS:=-lm
 
 NVCC        = nvcc
-NVCC_FLAGS  = -O3 -I/usr/local/cuda/include
-LD_FLAGS    = -lcudart -L/usr/local/cuda/lib64
+# NVCC_FLAGS  = -O3 -I/usr/local/cuda/include
+# LD_FLAGS    = -lcudart -L/usr/local/cuda/lib64
+NVCC_FLAGS  = -g
+LD_FLAGS    = -lcudart
 EXE         = ppm
 OBJ         = ppm.o
 
