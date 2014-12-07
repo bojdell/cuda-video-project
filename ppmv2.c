@@ -20,6 +20,13 @@ typedef struct {
      double bias;
 } Filter;
 
+typedef struct {
+     int x, y, z;
+     double data[125];
+     double factor;
+     double bias;
+} Filter_3D;
+
 #define CREATOR "DA BROS"
 #define RGB_COMPONENT_COLOR 255
 
@@ -200,6 +207,27 @@ void filterPPM(PPMImage *img, Filter f)
 
     img->data = new_data;
     
+}
+
+//       process
+//       ..... -----
+// 0 0 0 1 1 1 1 1 1
+void filterPPM_3D(PPMImage *frames[], int num_frames, Filter_3D f) {
+    if(!frames) {
+        return;
+    }
+
+    int frame;
+    int img_x, img_y;
+    int f_x = 1, f_y = 1, f_z = 3;
+    int pixel_x, pixel_y;
+    int frame_offset = f_z; // offset start so we have previous images to convolve with
+
+    for(frame = frame_offset; frame < f_z; frame++) {
+
+
+    }
+
 }
 
 double processImage(PPMImage * images, Filter f, int stride_len) {
