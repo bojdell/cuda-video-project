@@ -219,7 +219,7 @@ void writeFrames(PPMImage * frames, int z, int totalFrames)
         if (fileNum <= totalFrames)
         {
             sprintf(outstr, "../outfiles/tmp%03d.ppm", fileNum);
-            writePPM(outstr, frames[i]);
+            writePPM(outstr, &(frames[i]));
         }
     }
 }
@@ -257,12 +257,12 @@ int main(int argc, char *argv[]){
     char instr[80];
     char outstr[80];
 
-    PPMPixel *imageData_d, *outputData_d, *outputData_h, *inputFrames;
+    PPMPixel *imageData_d, *outputData_d, *outputData_h, *inputData_h;
     Filter3D * filter_h = initializeFilter();
 
     cudaError_t cuda_ret;
 
-    PPMImage *image *readPPM("../infiles/tmp001.ppm");
+    PPMImage *image =  readPPM("../infiles/tmp001.ppm");
 
     inputData_h  = (PPMPixel *)malloc(INPUT_TILE_X * INPUT_TILE_Y * INPUT_TILE_Z * sizeof(PPMPixel));
     outputData_h = (PPMPixel *)malloc(OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel));
@@ -286,7 +286,6 @@ int main(int argc, char *argv[]){
                   (INPUT_TILE_Y + 1) / BLOCK_SIZE + 1,
                   1);
 
-    begin = clock();
     for (int z = 0; z < totalFrames; z+=OUTPUT_TILE_Z)
     {
         loadFrames(inputFrames, z, totalFrames);
@@ -297,7 +296,10 @@ int main(int argc, char *argv[]){
                 getPixels(inputFrames, inputData_h, x, y, z, image->x, image->y, totalFrames);
                 cudaMemcpy(imageData_d, inputData_h, INPUT_TILE_X * INPUT_TILE_Y * INPUT_TILE_Z * sizeof(PPMPixel),
                            cudaMemcpyHostToDevice);
+                begin = clock();
                 convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d);
+                end = clock();
+                time_spent += (double)(end - begin) / CLOCKS_PER_SEC;
                 cudaMemcpy(outputData_h, outputData_d, OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel),
                            cudaMemcpyDeviceToHost);
                 writePixels(outputData_h, outputFrames, x, y, z, image->x);
@@ -305,7 +307,6 @@ int main(int argc, char *argv[]){
         }
         writeFrames(outputFrames, z, totalFrames);
     }
-    end = clock();
 
     free(inputData_h);
     free(outputData_h);
@@ -316,7 +317,6 @@ int main(int argc, char *argv[]){
     cudaFree(imageData_d);
     cudaFree(outputData_d);
 
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("%f seconds spent\n", time_spent);
 
     if (!system(NULL)) { exit (EXIT_FAILURE);}

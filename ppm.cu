@@ -171,7 +171,7 @@ int main(){
 
 
     clock_t begin, end;
-    double time_spent;
+    double time_spent = 0.0;
 
 
     /* here, do your time-consuming job */
@@ -193,7 +193,7 @@ int main(){
     cudaError_t cuda_ret;
 
     for(i = 0; i < 301; i++) {
-        sprintf(instr, "infiles/baby%03d.ppm", i+1);
+        sprintf(instr, "infiles/tmp%03d.ppm", i+1);
         images[i] = *readPPM(instr);
     }
     PPMImage *image;
@@ -215,10 +215,9 @@ int main(){
     cudaDeviceSynchronize();
 
 
-    begin = clock();
 
     for(i = 0; i < 301; i++) {
-        sprintf(outstr, "outfiles/baby%03d.ppm", i+1);
+        sprintf(outstr, "outfiles/tmp%03d.ppm", i+1);
 
         image = &images[i];
 
@@ -230,13 +229,16 @@ int main(){
         const unsigned int grid_y = (image->y -1) / OUTPUT_TILE_SIZE + 1;
         dim3 dim_grid(grid_x, grid_y, 1);
         dim3 dim_block(INPUT_TILE_SIZE, INPUT_TILE_SIZE, 1);
+        begin = clock();
         convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
+        end = clock();
+        time_spent += (double)(end - begin) / CLOCKS_PER_SEC;
 
         // Black and white
-        //dim dim_grid, dim_block;
-        //dim_grid = dim3(image->y, 1,1);
-        //dim_block = dim3(image->x, 1, 1);
-        //blackAndWhite<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
+        // dim dim_grid, dim_block;
+        // dim_grid = dim3(image->y, 1,1);
+        // dim_block = dim3(image->x, 1, 1);
+        // blackAndWhite<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
 
         cuda_ret = cudaDeviceSynchronize();
         if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel");
@@ -250,7 +252,6 @@ int main(){
         writePPM(outstr,outImage);
 
     }
-    end = clock();
 
     free(outputData_h);
     free(outImage);
@@ -273,7 +274,6 @@ int main(){
 
     // }
 
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 
     printf("%f seconds spent\n", time_spent);
 
