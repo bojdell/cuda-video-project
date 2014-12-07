@@ -209,27 +209,18 @@ void filterPPM(PPMImage *img, Filter f)
     
 }
 
-//       process
-//       ..... -----
-// 0 0 0 1 1 1 1 1 1
-void filterPPM_3D(PPMImage *frames[], int num_frames, Filter_3D f) {
-    if(!frames) {
-        return;
-    }
-
-    int frame;
+void colorPPM(PPMImage *img)
+{
     int img_x, img_y;
-    int f_x = 1, f_y = 1, f_z = 3;
-    int pixel_x, pixel_y;
-    int frame_offset = f_z; // offset start so we have previous images to convolve with
-
-    for(frame = frame_offset; frame < f_z; frame++) {
-
-
+    for(img_x = 0; img_x < img->x; img_x++) {
+        for(img_y = 0; img_y < img->y; img_y++) {
+            int avg = (img->data[img_y * img->x + img_x].red + img->data[img_y * img->x + img_x].green + img->data[img_y * img->x + img_x].blue) / 3;
+            img->data[img_y * img->x + img_x].red = avg;
+            img->data[img_y * img->x + img_x].green = avg;
+            img->data[img_y * img->x + img_x].blue = avg;
+        }
     }
-
 }
-
 double processImage(PPMImage * images, Filter f, int stride_len) {
     double time_spent = -1.0;
     clock_t begin, end;
@@ -262,6 +253,7 @@ double processImage(PPMImage * images, Filter f, int stride_len) {
             
             begin = clock();
             filterPPM(img, f);
+            // colorPPM(img);
             end = clock();
             time_spent += ((double)(end - begin) / CLOCKS_PER_SEC);
         }
@@ -274,7 +266,7 @@ double processImage(PPMImage * images, Filter f, int stride_len) {
             writePPM(outstr, &images[j]);
         }
 
-        freeImage(&images[j]);
+        // freeImage(&images[j]);
     }
 
     return time_spent;
@@ -296,6 +288,7 @@ int main(int argc, char *argv[]){
     double time_spent;   // time spent for each chunk, plus accumulate total at end
 
     PPMImage images[stride_len];
+
     Filter blur = {
         .x = 5,
         .y = 5,
@@ -311,10 +304,25 @@ int main(int argc, char *argv[]){
         .bias = 0
     };
 
+    Filter emboss = {
+        .x = 5,
+        .y = 5,
+        .data = {
+            0, 0, 0, 0, 0,
+            0, -2, -1, 0, 0,
+            0, -1, 1, 1, 0,
+            0, 0, 1, 2, 0,
+            0, 0, 0, 0, 0
+        },
+
+        .factor = 1.0,
+        .bias = 0
+    };
+
     // loop over all frames, in chunks of stride_len
     begin = clock();
 
-    double calc_time = processImage(images, blur, stride_len);
+    double calc_time = processImage(images, emboss, stride_len);
 
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
