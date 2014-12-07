@@ -120,7 +120,13 @@ Filter3D * initializeFilter()
 {
     int data[FILTER_SIZE][FILTER_SIZE][FILTER_SIZE] =  { { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
-                                                           {0, 0, 1, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0} },
+
+                                                         { {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} },
 
@@ -132,19 +138,13 @@ Filter3D * initializeFilter()
 
                                                          { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
-                                                           {0, 0, 1, 0, 0},
+                                                           {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} },
 
                                                          { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
-                                                           {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0} },
-
-                                                         { {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
-                                                           {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} }
                                                        };
@@ -161,6 +161,67 @@ Filter3D * initializeFilter()
     filter->factor = 1.0;
     filter->bias =0;
     return filter;
+}
+
+void loadFrames(PPMImage * frames, int z, int totalFrames)
+{
+    char instr[80];
+    for (int i = 0; i < INPUT_TILE_Z; i++)
+    {
+        int fileNum = i + z + 1 - FILTER_SIZE / 2;
+        if (fileNum <= totalFrames && fileNum > 0)
+        {
+            sprintf(instr, "../infiles/tmp%03d.ppm", fileNum);
+            frames[i] = *readPPM(instr);
+        }
+    }
+}
+
+void getPixels(PPMImage * frames, PPMPixel * data, int x, int y, int z, int width, int height, int depth)
+{
+    for (int k = 0; k < INPUT_TILE_Z; k++)
+    {
+        for (int j = 0; j < INPUT_TILE_Y; j++)
+        {
+            for (int i = 0; i < INPUT_TILE_X; i++)
+            {
+                int data_x = i + x - FILTER_SIZE / 2;
+                int data_y = j + y - FILTER_SIZE / 2;
+                int data_z = k + z - FILTER_SIZE / 2;
+                if ((data_x >= 0) && (data_x < width) && (data_y >= 0) && (data_y < height) &&
+                    (data_z >= 0) && (data_z < depth))
+                    data[k * INPUT_TILE_X * INPUT_TILE_Y + j * INPUT_TILE_X + i] = frames[k].data[data_y * width + data_x];
+                else
+                {
+                    data[k * INPUT_TILE_X * INPUT_TILE_Y + j * INPUT_TILE_X + i].red = 0;
+                    data[k * INPUT_TILE_X * INPUT_TILE_Y + j * INPUT_TILE_X + i].blue = 0;
+                    data[k * INPUT_TILE_X * INPUT_TILE_Y + j * INPUT_TILE_X + i].green = 0;
+                }
+            }
+        }
+    }
+}
+
+void writePixels(PPMPixel * data, PPMImage * frames, int x, int y, int z, int width)
+{
+    for (int k = 0; k < OUTPUT_TILE_Z; k++)
+        for (int j = 0; j < OUTPUT_TILE_Y; j++)
+            for (int i = 0; i < OUTPUT_TILE_X; i++)
+                    frames[k].data[(y + j) * width + x + i] = data[k * OUTPUT_TILE_X * OUTPUT_TILE_Y + j * OUTPUT_TILE_X + i];
+}
+
+void writeFrames(PPMImage * frames, int z, int totalFrames)
+{
+    char outstr[80];
+    for (int i = 0; i < OUTPUT_TILE_Z; i++)
+    {
+        int fileNum = i + z + 1;
+        if (fileNum <= totalFrames)
+        {
+            sprintf(outstr, "../outfiles/tmp%03d.ppm", fileNum);
+            writePPM(outstr, frames[i]);
+        }
+    }
 }
 
 int main(int argc, char *argv[]){
@@ -195,41 +256,61 @@ int main(int argc, char *argv[]){
 
     char instr[80];
     char outstr[80];
-    int i = 0;
 
-    PPMImage images[totalFrames];
-
-    PPMPixel *imageData_d, *outputData_d, *outputData_h;
+    PPMPixel *imageData_d, *outputData_d, *outputData_h, *inputFrames;
     Filter3D * filter_h = initializeFilter();
 
     cudaError_t cuda_ret;
 
-    for(i = 0; i < totalFrames - 1; i++) {
-        sprintf(instr, "../infiles/tmp%03d.ppm", i+1);
-        images[i] = *readPPM(instr);
-    }
+    PPMImage *image *readPPM("../infiles/tmp001.ppm");
 
-    PPMImage *image;
-    image = &images[0];
-    outputData_h = (PPMPixel *)malloc(image->x*image->y*sizeof(PPMPixel));
+    inputData_h  = (PPMPixel *)malloc(INPUT_TILE_X * INPUT_TILE_Y * INPUT_TILE_Z * sizeof(PPMPixel));
+    outputData_h = (PPMPixel *)malloc(OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel));
+    PPMImage inputFrames[OUTPUT_TILE_Z], outputFrames[OUTPUT_TILE_Z];
 
-    cuda_ret = cudaMalloc((void**)&(imageData_d), image->x*image->y*sizeof(PPMPixel));
+    for (int i = 0; i < INPUT_TILE_Z; i++)
+            inputFrames[i].data = (PPMPixel *)malloc(image->x * image->y * sizeof(PPMPixel));
+    for (int i = 0; i < OUTPUT_TILE_Z; i++)
+        outputFrames[i].data = (PPMPixel *)malloc(image->x * image->y * sizeof(PPMPixel));
+
+    cuda_ret = cudaMalloc((void**)&(imageData_d), INPUT_TILE_X * INPUT_TILE_Y * INPUT_TILE_Z * sizeof(PPMPixel));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory");
 
-    cuda_ret = cudaMalloc((void**)&(outputData_d), image->x*image->y*sizeof(PPMPixel));
+    cuda_ret = cudaMalloc((void**)&(outputData_d), OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory");
 
-    PPMImage *outImage;
+    /*PPMImage *outImage;
     outImage = (PPMImage *)malloc(sizeof(PPMImage));
     outImage->x = image->x;
-    outImage->y = image->y;
+    outImage->y = image->y;*/
 
     cudaMemcpyToSymbol(filter_c, filter_h, sizeof(Filter3D));
     cudaDeviceSynchronize();
+    dim3 dim_block(BLOCK_SIZE, BLOCK_SIZE, INPUT_TILE_Z);
+    dim3 dim_grid((INPUT_TILE_X + 1) / BLOCK_SIZE + 1,
+                  (INPUT_TILE_Y + 1) / BLOCK_SIZE + 1,
+                  1);
 
+    for (int z = 0; z < totalFrames; z+=OUTPUT_TILE_Z)
+    {
+        loadFrames(inputFrames, z, totalFrames);
+        for (int y = 0; y < image->y; y+=OUTPUT_TILE_Y)
+        {
+            for (int x = 0; x < image->x; x+=OUTPUT_TILE_X)
+            {
+                getPixels(inputFrames, inputData_h, x, y, z, image->x, image->y, totalFrames);
+                cudaMemcpy(imageData_d, inputData_h, INPUT_TILE_X * INPUT_TILE_Y * INPUT_TILE_Z * sizeof(PPMPixel),
+                           cudaMemcpyHostToDevice);
+                convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d);
+                cudaMemcpy(outputData_h, outputData_d, OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel),
+                           cudaMemcpyDeviceToHost);
+                writePixels(outputData_h, outputFrames, x, y, z);
+            }
+        }
+        writeFrames(outputFrames, z);
+    }
 
-
-    for(i = 0; i < totalFrames-1; i++) {
+    /*for(i = 0; i < totalFrames-1; i++) {
         sprintf(outstr, "../outfiles/tmp%03d.ppm", i+1);
 
         image = &images[i];
@@ -267,11 +348,11 @@ int main(int argc, char *argv[]){
     free(outputData_h);
     free(outImage);
     cudaFree(imageData_d);
-    cudaFree(outputData_d);
+    cudaFree(outputData_d); */
 
     if (!system(NULL)) { exit (EXIT_FAILURE);}
     sprintf(ffmpegString, "ffmpeg -framerate 24 -i ../outfiles/tmp%%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p ../outfilter.mp4");
-    system (ffmpegString);   
+    system (ffmpegString);
 
     printf("%f seconds spent\n", time_spent);
 
