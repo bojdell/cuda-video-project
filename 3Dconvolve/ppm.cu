@@ -304,10 +304,10 @@ int main(int argc, char *argv[]){
                 convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d);
                 cudaMemcpy(outputData_h, outputData_d, OUTPUT_TILE_X * OUTPUT_TILE_Y * OUTPUT_TILE_Z * sizeof(PPMPixel),
                            cudaMemcpyDeviceToHost);
-                writePixels(outputData_h, outputFrames, x, y, z);
+                writePixels(outputData_h, outputFrames, x, y, z, image->x);
             }
         }
-        writeFrames(outputFrames, z);
+        writeFrames(outputFrames, z, totalFrames);
     }
 
     /*for(i = 0; i < totalFrames-1; i++) {
