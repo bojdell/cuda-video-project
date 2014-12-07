@@ -140,30 +140,61 @@ void filterPPM_3D(PPMImage *frames[], int num_frames, Filter3D f) {
 
 }
 
-// read n frames into images[], starting at frame offset
-void readFrames(PPMImage ** images, int n, int offset) {
+// read n frames into images[], starting at frame start. if start < 0, leave pointers null
+void readFrames(PPMImage ** images, int num_images, int n, int start) {
+    char instr[80]; // filename for input file
+
     int j;
     for(j = 0; j < n; j++) {
-        sprintf(instr, "infiles/baby%03d.ppm", j + 1);
-        PPMImage * img = readPPM(instr);
-        if(img == NULL) {
-            printf("All files processed\n");
-            return;
+        if(j + start >= 0 && j + start < num_images) {
+            sprintf(instr, "infiles/baby%03d.ppm", j + start);
+            PPMImage * img = readPPM(instr);
+            if(!img) {
+                return;
+            }
+            images[j + start] = img;
         }
-        images[j + offset] = img;
+        else {
+            if(images[j + start])
+                freeImage(images[j + start])
+            images[j + start] = NULL;
+        }
     }
 }
 
-double processImage(PPMImage ** images, Filter3D f, cdim3 stride) {
+// write n frames from images[] to ppm files, unless pointer is null
+void writeFrames(PPMImage ** images, int num_images, int n, int start) {
+    char outstr[80];    // filename for output file
+
+    int j;
+    for(j = 0; j < n; j++) {
+        if(j + start >= 0 && j + start < num_images && images[j + start]) {
+            sprintf(outstr, "outfiles/baby%03d.ppm", j + start);
+            writePPM(outstr, images[j]);
+            freeImage(images[j]);
+        }
+    }
+}
+
+void processChunk(PPMImage * image, int start_x, int start_y, int end_x, int end_y) {
+    if(!image || start_x > end_x || start_y > end_y)
+        return;
+
+    int i, j;
+    for(i = start_x; i <= end_x; x++) {
+        for(j = start_y; j <= end_y; y++) {
+            image->data[]
+        }
+    }
+}
+
+double processImages(PPMImage ** images, Filter3D f, cdim3 stride) {
     if(!images || !images[0]) {
         return -1;
     }
 
     double time_spent = -1.0;
     clock_t begin, end;
-
-    char instr[80];         // filename for input file
-    char outstr[80];        // filename for output file
 
     int numFrames = 301;    // max # frames
 
@@ -174,36 +205,32 @@ double processImage(PPMImage ** images, Filter3D f, cdim3 stride) {
         (int)ceil((double)numFrames / stride.z)
     };
 
-    // loop vars
+    // loop vars: x, y, z respectively
     int i = 0, j = 0, k = 0;
 
     // for each plane of input chunks
-    for(i = 0; i < numFrames + stride.z - 1; i += stride.z) {
+    for(i = 0; i < numChunks.z; i += stride.z) {
 
         // read stride.z frames into images[], with f.z / 2 padding in front and back
-        if()
-        readFrames(images, stride.z + f.z / 2, f.z / 2)
+        readFrames(images, numFrames, stride.z + f.z - 1, -f.z / 2)
+
+        // process each frame
+        
         
         // process chunks of size stride.x * stride.y in images[]
-        for(j = 0; j < stride_len && i + j < numFrames; j++) {
-        //for(j = 0; j < 1; j++) {
-
-            PPMImage * img = images[j];
-            
-            begin = clock();
-            // filterPPM_3D(img, f);
-            end = clock();
-            time_spent += ((double)(end - begin) / CLOCKS_PER_SEC);
-        }
+        // for(j = 0; j < numChunks.y; j++) {
+        //     for(k = 0; k < numChunks.x; k++) {
+        //         PPMImage * img = images[j];
+                
+        //         begin = clock();
+        //         // filterPPM_3D(img, f);
+        //         end = clock();
+        //         time_spent += ((double)(end - begin) / CLOCKS_PER_SEC);
+        //     }
+        // }
         
-        
-
-        // write 1 chunk of stride_len frames from images[]
-        for(j = 0; j < stride_len && i + j < numFrames; j++) {
-            sprintf(outstr, "outfiles/baby%03d.ppm", i + j + 1);
-            writePPM(outstr, images[j]);
-            freeImage(images[j]);
-        }
+        // write stride.z frames from images[] to ppm files
+        writeFrames(images, numFrames, stride.z);
     }
 
     return time_spent;
@@ -224,14 +251,19 @@ int main(int argc, char *argv[]) {
     clock_t begin, end;
     double time_spent;   // time spent for each chunk, plus accumulate total at end
 
-    PPMImage * images[stride_len];
-    Filter3D nothing = {
+    Filter3D f = {
         .x = 5,
         .y = 5,
         .z = 5,
         .data =    { { {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0},
-                       {0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} },
+
+                     { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0} },
 
@@ -243,19 +275,13 @@ int main(int argc, char *argv[]) {
 
                      { {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0},
-                       {0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0} },
 
                      { {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0},
-                       {0, 0, 1, 0, 0},
                        {0, 0, 0, 0, 0},
-                       {0, 0, 0, 0, 0} },
-
-                     { {0, 0, 0, 0, 0},
-                       {0, 0, 0, 0, 0},
-                       {0, 0, 1, 0, 0},
                        {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0} }
                    },
@@ -263,13 +289,16 @@ int main(int argc, char *argv[]) {
         .bias = 0
     };
 
+    // create space for video frames
+    PPMImage * images[stride_len + f.z - 1];
+
     // set the stride we will use to break up our files
     cdim3 stride = { 10, 10, stride_len };
 
     // loop over all frames, in chunks of stride_len
     begin = clock();
 
-    double calc_time = processImage(images, nothing, stride);
+    double calc_time = processImages(images, f, stride);
 
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
