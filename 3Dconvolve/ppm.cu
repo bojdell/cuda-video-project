@@ -129,39 +129,43 @@ void writePPM(const char *filename, PPMImage *img)
     fclose(fp);
 }
 
-void changeColorPPM(PPMImage *img)
+Filter3D * initializeFilter()
 {
-    int i;
-    if(img){
-
-         for(i=0;i<img->x*img->y;i++){
-              int avg = (img->data[i].red + img->data[i].green + img ->data[i].blue) / 3;
-
-              /*
-              img->data[i].red=RGB_COMPONENT_COLOR-img->data[i].red;
-              img->data[i].green=RGB_COMPONENT_COLOR-img->data[i].green;
-              img->data[i].blue=RGB_COMPONENT_COLOR-img->data[i].blue;
-              */
-
-              img->data[i].red = avg;
-              img->data[i].green = avg;
-              img->data[i].blue = avg;
-         }
-    }
-}
-
-Filter * initializeFilter()
-{
-    int data[FILTER_SIZE * FILTER_SIZE] = {0, 0, 0, 0, 0,
-                                           0, -1, -1, -1, 0,
-                                           0, -1, 8, -1, 0,
-                                           0, -1, -1, -1, 0,
-                                           0, 0, 0, 0, 0};
-    Filter * filter = (Filter*) malloc(sizeof(Filter));
+    int data[FILTER_SIZE][FILTER_SIZE][FILTER_SIZE] =  { { {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 1, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0} },
+                                                         { {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 1, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0} },
+                                                         { {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 1, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0} },
+                                                         { {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 1, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0} },
+                                                         { {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 1, 0, 0},
+                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 0, 0, 0} }
+                                                       };
+    Filter3D * filter = (Filter3D*) malloc(sizeof(Filter3D));
     filter->x = FILTER_SIZE;
     filter->y = FILTER_SIZE;
-    for (int i = 0; i < FILTER_SIZE * FILTER_SIZE; i++)
-       filter->data[i] = data[i];
+    filter->z = FILTER_SIZE;
+    for (int z = 0; z < FILTER_SIZE; z++)
+        for (int y = 0; y < FILTER_SIZE; y++)
+            for (int x = 0; x < FILTER_SIZE; x++)
+                filter[z][y][x] = data[z][y][x];
+
     filter->factor = 1.0;
     filter->bias =0;
     return filter;
@@ -188,7 +192,7 @@ int main(){
     // }
 
     PPMPixel *imageData_d, *outputData_d, *outputData_h;
-    Filter * filter_h = initializeFilter();
+    Filter3D * filter_h = initializeFilter();
 
     cudaError_t cuda_ret;
 
@@ -196,6 +200,7 @@ int main(){
         sprintf(instr, "infiles/baby%03d.ppm", i+1);
         images[i] = *readPPM(instr);
     }
+
     PPMImage *image;
     image = &images[0];
     outputData_h = (PPMPixel *)malloc(image->x*image->y*sizeof(PPMPixel));
@@ -231,12 +236,6 @@ int main(){
         dim3 dim_grid(grid_x, grid_y, 1);
         dim3 dim_block(INPUT_TILE_SIZE, INPUT_TILE_SIZE, 1);
         convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
-
-        // Black and white
-        //dim dim_grid, dim_block;
-        //dim_grid = dim3(image->y, 1,1);
-        //dim_block = dim3(image->x, 1, 1);
-        //blackAndWhite<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
 
         cuda_ret = cudaDeviceSynchronize();
         if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel");

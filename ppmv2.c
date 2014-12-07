@@ -245,7 +245,7 @@ double processImage(PPMImage * images, Filter f, int stride_len) {
 
         // read 1 chunk of stride_len frames into images[]
         for(j = 0; j < stride_len && j + i*stride_len < numFrames; j++) {
-            sprintf(instr, "infiles/filename%03d.ppm", i*stride_len + j + 1);
+            sprintf(instr, "infiles/baby%03d.ppm", i*stride_len + j + 1);
             PPMImage * img = readPPM(instr);
             if(img == NULL) {
                 printf("All files processed\n");
