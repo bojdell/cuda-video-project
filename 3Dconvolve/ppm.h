@@ -1,17 +1,17 @@
 #ifndef PPMH
 #define PPMH
 
-#define FILTER_SIZE 5
-#define OUTPUT_TILE_X 156
-#define OUTPUT_TILE_Y 156
-#define OUTPUT_TILE_Z 5
-#define INPUT_TILE_X  OUTPUT_TILE_X + FILTER_SIZE - 1
-#define INPUT_TILE_Y  OUTPUT_TILE_Y + FILTER_SIZE - 1
-#define INPUT_TILE_Z  OUTPUT_TILE_Z + FILTER_SIZE - 1
-#define BLOCK_SIZE 16
+#define FILTER_SIZE (5)
+#define OUTPUT_TILE_X (156)
+#define OUTPUT_TILE_Y (156)
+#define OUTPUT_TILE_Z (5)
+#define INPUT_TILE_X  (OUTPUT_TILE_X + FILTER_SIZE - 1)
+#define INPUT_TILE_Y  (OUTPUT_TILE_Y + FILTER_SIZE - 1)
+#define INPUT_TILE_Z  (OUTPUT_TILE_Z + FILTER_SIZE - 1)
+#define BLOCK_SIZE (16)
 
-#define CREATOR "DA BROS"
-#define RGB_COMPONENT_COLOR 255
+#define CREATOR ("DA BROS")
+#define RGB_COMPONENT_COLOR (255)
 
 typedef struct {
      unsigned char red,green,blue;

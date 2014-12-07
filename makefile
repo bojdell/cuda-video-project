@@ -33,14 +33,14 @@ EXE	        = ppm
 OBJ	        = ppm.o
 
 
-default: $(EXE) ppmTmp
+default: $(EXE)
 
 
-ppmTmp: ppmTmp.o
-	$(CC) ppmTmp.o $(LDFLAGS) -o ppmTmp
+# ppmTmp: ppmTmp.o
+# 	$(CC) ppmTmp.o $(LDFLAGS) -o ppmTmp
 
-ppmTmp.o: ppmTmp.c
-	$(CC) $(CFLAGS) ppmTmp.c $(INCLUDES)
+# ppmTmp.o: ppmTmp.c
+# 	$(CC) $(CFLAGS) ppmTmp.c $(INCLUDES)
 
 
 ppm.o: ppm.cu ppmKernel.cu 
