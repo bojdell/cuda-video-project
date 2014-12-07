@@ -119,14 +119,20 @@ void writePPM(const char *filename, PPMImage *img)
 Filter3D * initializeFilter()
 {
     double data[FILTER_SIZE][FILTER_SIZE][FILTER_SIZE] =  { { {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
+                                                           {0, -1, -1, -1, 0},
+                                                           {0, -1, 8, -1, 0},
+                                                           {0, -1, -1, -1, 0},
+                                                           {0, 0, 0, 0, 0} },
+
+                                                         { {0, 0, 0, 0, 0},
+                                                           {0, -1, -1, -1, 0},
+                                                           {0, -1, 8, -1, 0},
+                                                           {0, -1, -1, -1, 0},
                                                            {0, 0, 0, 0, 0} },
 
                                                          { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} },
 
@@ -138,13 +144,7 @@ Filter3D * initializeFilter()
 
                                                          { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0} },
-
-                                                         { {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
-                                                           {0, 0, 0, 0, 0},
+                                                           {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} }
                                                        };
@@ -159,7 +159,7 @@ Filter3D * initializeFilter()
                 (filter->data)[z][y][x] = data[z][y][x];
             }
 
-    filter->factor = 1.0;
+    filter->factor = .25;
     filter->bias =0;
     return filter;
 }
@@ -209,7 +209,7 @@ void writePixels(PPMPixel * data, PPMImage * frames, int x, int y, int z, int wi
         for (int j = 0; j < OUTPUT_TILE_Y; j++)
             for (int i = 0; i < OUTPUT_TILE_X; i++) {
                 if(x+i < width && y + j < height)
-                    frames[k].data[width*(y+j)+ x+i] = data[k * OUTPUT_TILE_X * OUTPUT_TILE_Y + j * OUTPUT_TILE_X + i];
+                    frames[k].data[width*(y+j)+ x+i] = data[k * OUTPUT_TILE_X * OUTPUT_TILE_Y + i * OUTPUT_TILE_X + j];
             }
 }
 
@@ -273,7 +273,7 @@ int main(int argc, char *argv[]){
     for (int i = 0; i < INPUT_TILE_Z; i++) {
         inputFrames[i].x = image->x;
         inputFrames[i].y = image->y;
-        inputFrames[i].data = (PPMPixel *)malloc(image->x * image->y * sizeof(PPMPixel));        
+        inputFrames[i].data = (PPMPixel *)malloc(image->x * image->y * sizeof(PPMPixel));
     }
     for (int i = 0; i < OUTPUT_TILE_Z; i++) {
         outputFrames[i].x = image->x;
