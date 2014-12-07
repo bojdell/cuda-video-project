@@ -4,11 +4,14 @@
 #include <math.h>
 #include "ppm.h"
 
-void freeImage(PPMImage * image) {
-    if(image) {
-        if(image->data)
-            free(image->data);
-        free(image);
+void freeImage(PPMImage ** image) {
+    if(*image) {
+        if((*image)->data) {
+            free((*image)->data);
+            (*image)->data = NULL;
+        }
+        free(*image);
+        *image = NULL;
     }
 }
 
@@ -122,22 +125,55 @@ void writePPM(const char *filename, PPMImage *img)
 //       process
 //       ..... -----
 // 0 0 0 1 1 1 1 1 1
-void filterPPM_3D(PPMImage *frames[], int num_frames, Filter3D f) {
-    if(!frames) {
+void filterPPM_3D(PPMImage **images, int idx, Filter3D f) {
+    if(!images) {
         return;
     }
 
-    int frame;
     int img_x, img_y;
-    int f_x = 1, f_y = 1, f_z = 3;
-    int pixel_x, pixel_y;
-    int frame_offset = f_z; // offset start so we have previous images to convolve with
+    int f_x, f_y, f_z;
+    int pixel_x, pixel_y, pixel_z;
+    int red = 0, green = 0, blue = 0;
+    PPMImage * img = images[idx];
+    PPMPixel * new_data = (PPMPixel*)malloc(img->x * img->y * sizeof(PPMPixel));
 
-    for(frame = frame_offset; frame < f_z; frame++) {
+    // for each pixel in the image
+    for(img_x = 0; img_x < img->x; img_x++) {
+        for(img_y = 0; img_y < img->y; img_y++) {
 
+            // apply the filter to surrounding pixels
+            for(f_x = 0; f_x < f.x; f_x++) {
+                for(f_y = 0; f_y < f.y; f_y++) {
+                    for(f_z = 0; f_z < f.z; f_z++) {
+                        // get absolute locations of pixel
+                        pixel_x = img_x + (f_x - f.x / 2);
+                        pixel_y = img_y + (f_y - f.y / 2);
+                        pixel_z = idx + (f_z - f.z / 2);
 
+                        // check to make sure coordinates are vaild (don't need to check z b/c of input/output tile relation)
+                        if(pixel_x >= 0 && pixel_x < img->x && pixel_y >= 0 && pixel_y < img->y) {
+                            int curr_red = images[pixel_z]->data[pixel_y * img->x + pixel_x].red;
+                            int curr_green = images[pixel_z]->data[pixel_y * img->x + pixel_x].green;
+                            int curr_blue = images[pixel_z]->data[pixel_y * img->x + pixel_x].blue;
+                            int fval = f.data[f_z][f_y][f_x];
+
+                            red += curr_red * fval;
+                            green += curr_green * fval;
+                            blue += curr_blue * fval;
+                        }
+                    }
+                }
+            }
+
+            // apply filter factor and bias, and write resultant pixel to new_data
+            new_data[img_y * img->x + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
+            new_data[img_y * img->x + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
+            new_data[img_y * img->x + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
+        }
     }
 
+    free(img->data);
+    img->data = new_data;
 }
 
 // read n frames into images[], starting at frame start. if start < 0, leave pointers null
@@ -155,9 +191,8 @@ void readFrames(PPMImage ** images, int num_images, int n, int start) {
             images[j + start] = img;
         }
         else {
-            if(images[j + start])
-                freeImage(images[j + start])
-            images[j + start] = NULL;
+            // if(images[j + start])
+                // freeImage(&images[j + start]);
         }
     }
 }
@@ -170,52 +205,58 @@ void writeFrames(PPMImage ** images, int num_images, int n, int start) {
     for(j = 0; j < n; j++) {
         if(j + start >= 0 && j + start < num_images && images[j + start]) {
             sprintf(outstr, "outfiles/baby%03d.ppm", j + start);
-            writePPM(outstr, images[j]);
-            freeImage(images[j]);
+            writePPM(outstr, images[j + start]);
+            // freeImage(&images[j]);
         }
     }
 }
 
-void processChunk(PPMImage * image, int start_x, int start_y, int end_x, int end_y) {
-    if(!image || start_x > end_x || start_y > end_y)
-        return;
+// void processChunk(PPMImage * image, int start_x, int start_y, int end_x, int end_y) {
+//     if(!image || start_x > end_x || start_y > end_y)
+//         return;
 
-    int i, j;
-    for(i = start_x; i <= end_x; x++) {
-        for(j = start_y; j <= end_y; y++) {
-            image->data[]
-        }
-    }
-}
+//     int i, j;
+//     for(i = start_x; i <= end_x; x++) {
+//         for(j = start_y; j <= end_y; y++) {
+//             image->data[]
+//         }
+//     }
+// }
 
 double processImages(PPMImage ** images, Filter3D f, cdim3 stride) {
-    if(!images || !images[0]) {
+    if(!images) {
         return -1;
     }
 
     double time_spent = -1.0;
     clock_t begin, end;
 
-    int numFrames = 301;    // max # frames
+    int numFrames = 20;    // max # frames
 
     // calculate number of chunks in each dimension
-    cdim3 numChunks = {
-        (int)ceil((double)images[0]->x / stride.x),
-        (int)ceil((double)images[0]->y / stride.y),
-        (int)ceil((double)numFrames / stride.z)
-    };
+    int numChunks = (int)ceil((double)numFrames / stride.z);
+    // cdim3 numChunks = {
+    //     (int)ceil((double)images[0]->x / stride.x),
+    //     (int)ceil((double)images[0]->y / stride.y),
+    //     (int)ceil((double)numFrames / stride.z)
+    // };
 
-    // loop vars: x, y, z respectively
-    int i = 0, j = 0, k = 0;
+    // loop vars
+    int i = 0, j = 0;
 
     // for each plane of input chunks
-    for(i = 0; i < numChunks.z; i += stride.z) {
+    for(i = 0; i < numChunks; i += stride.z) {
 
         // read stride.z frames into images[], with f.z / 2 padding in front and back
-        readFrames(images, numFrames, stride.z + f.z - 1, -f.z / 2)
+        readFrames(images, numFrames, stride.z, i - f.z / 2);
 
-        // process each frame
-        
+        // process each frame we want to output (i.e. i + f.z/2 to i + stride.z - f.z/2)
+        for(j = f.z / 2; j < stride.z - f.z / 2; j++) {
+            if(!images[i + j]) {
+                break;
+            }
+            filterPPM_3D(images, i + j, f);
+        }
         
         // process chunks of size stride.x * stride.y in images[]
         // for(j = 0; j < numChunks.y; j++) {
@@ -230,7 +271,7 @@ double processImages(PPMImage ** images, Filter3D f, cdim3 stride) {
         // }
         
         // write stride.z frames from images[] to ppm files
-        writeFrames(images, numFrames, stride.z);
+        writeFrames(images, numFrames, stride.z, i - f.z / 2);
     }
 
     return time_spent;
@@ -246,10 +287,11 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+    // read in stride_len (stride in z-direction)
     int stride_len = atoi(argv[1]);
 
     clock_t begin, end;
-    double time_spent;   // time spent for each chunk, plus accumulate total at end
+    double time_spent;
 
     Filter3D f = {
         .x = 5,
@@ -289,15 +331,15 @@ int main(int argc, char *argv[]) {
         .bias = 0
     };
 
-    // create space for video frames
+    // create space for video frames (including padding)
     PPMImage * images[stride_len + f.z - 1];
 
     // set the stride we will use to break up our files
-    cdim3 stride = { 10, 10, stride_len };
+    cdim3 stride = { 10, 10, stride_len + f.z - 1 };
 
-    // loop over all frames, in chunks of stride_len
     begin = clock();
-
+    printf("1\n");
+    // loop over all frames, in chunks of stride_len
     double calc_time = processImages(images, f, stride);
 
     end = clock();
