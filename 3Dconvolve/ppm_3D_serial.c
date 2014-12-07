@@ -225,7 +225,7 @@ double processImages(PPMImage ** images, Filter3D f, cdim3 stride, PPMImage ** n
     double time_spent = -1.0;
     clock_t begin, end;
 
-    int numFrames = 301;    // max # frames
+    int numFrames = 50;    // max # frames
     // PPMImage * new_images[stride.z];  // TODO
 
     // calculate number of chunks in each dimension
@@ -250,7 +250,12 @@ double processImages(PPMImage ** images, Filter3D f, cdim3 stride, PPMImage ** n
             if(!images[j]) {
                 break;
             }
+            begin = clock();
+            
             filterPPM_3D(images, j, f, new_images);
+
+            end = clock();
+            time_spent += ((double)(end - begin) / CLOCKS_PER_SEC);
         }
         
         // process chunks of size stride.x * stride.y in images[]
@@ -289,7 +294,7 @@ int main(int argc, char *argv[]) {
     clock_t begin, end;
     double time_spent;
 
-    Filter3D f = {
+    Filter3D sobel = {
         .x = 5,
         .y = 5,
         .z = 5,
@@ -323,9 +328,87 @@ int main(int argc, char *argv[]) {
                        {0, 0, 0, 0, 0},
                        {0, 0, 0, 0, 0} }
                    },
-        .factor = 1,
+        .factor = .5,
         .bias = 0
     };
+
+    // Filter3D sobel2 = {
+    //     .x = 5,
+    //     .y = 5,
+    //     .z = 5,
+    //     .data =    { { {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0} },
+
+    //                  { {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0} },
+
+    //                  { {0, 0, 0, 0, 0},
+    //                    {0, 1, 0, -1, 0},
+    //                    {0, 2, 0, -2, 0},
+    //                    {0, 1, 0, -1, 0},
+    //                    {0, 0, 0, 0, 0} },
+
+    //                  { {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0} },
+
+    //                  { {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0},
+    //                    {0, 0, 0, 0, 0} }
+    //                },
+    //     .factor = 1,
+    //     .bias = 0
+    // };
+
+    Filter3D motion_blur = {
+        .x = 5,
+        .y = 5,
+        .z = 5,
+        .data =    { { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} },
+
+                     { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} },
+
+                     { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} },
+
+                     { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} },
+
+                     { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} }
+                   },
+        .factor = .25,
+        .bias = 0
+    };
+
+    Filter3D f = motion_blur;
 
     // create space for video frames (including padding)
     PPMImage * images[stride_len + f.z - 1];
