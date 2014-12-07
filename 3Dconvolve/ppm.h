@@ -1,6 +1,9 @@
 #ifndef PPMH
 #define PPMH
 
+#define OUTPUT_TILE_SIZE 12
+#define INPUT_TILE_SIZE 22
+#define FRAME_DEPTH 5
 
 #define FILTER_SIZE 5
 

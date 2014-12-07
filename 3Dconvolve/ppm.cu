@@ -1,22 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <dirent.h>
 #include <time.h>
 #include "ppmKernel.cu"
 #include "ppm.h"
 
-// typedef struct {
-//      unsigned char red,green,blue;
-// } PPMPixel;
-
-// typedef struct {
-//      int x, y;
-//      PPMPixel *data;
-// } PPMImage;
-
 #define CREATOR "RPFELGUEIRAS"
 #define RGB_COMPONENT_COLOR 255
 
-#define OUTPUT_TILE_SIZE 12
 
 
 #define FATAL(msg, ...) \
@@ -101,6 +92,7 @@ static PPMImage *readPPM(const char *filename)
     fclose(fp);
     return img;
 }
+
 void writePPM(const char *filename, PPMImage *img)
 {
     FILE *fp;
@@ -164,18 +156,42 @@ Filter3D * initializeFilter()
     for (int z = 0; z < FILTER_SIZE; z++)
         for (int y = 0; y < FILTER_SIZE; y++)
             for (int x = 0; x < FILTER_SIZE; x++)
-                filter[z][y][x] = data[z][y][x];
+                (filter->data)[z][y][x] = data[z][y][x];
 
     filter->factor = 1.0;
     filter->bias =0;
     return filter;
 }
 
-int main(){
+int main(int argc, char *argv[]){
+    char *infile = "foreman.mp4";
+    char ffmpegString[200];
+    if(argc > 1) {
+      infile = argv[1];
 
+      if (!system(NULL)) {exit (EXIT_FAILURE);}
+      system("exec rm -r ../infiles/*");
+      sprintf(ffmpegString, "ffmpeg -i ../input_videos/%s -f image2 -vf fps=fps=24 ../infiles/tmp%%03d.ppm", infile);
+      system (ffmpegString);
+
+    }
+    system("exec rm -r ../outfiles/*");
+
+    int totalFrames = 0;
+    DIR * dirp;
+    struct dirent * entry;
+
+    dirp = opendir("../infiles"); /* There should be error handling after this */
+    while ((entry = readdir(dirp)) != NULL) {
+        if (entry->d_type == DT_REG) { /* If the entry is a regular file */
+             totalFrames++;
+        }
+    }
+    closedir(dirp);
+    printf("%d\n", totalFrames);
 
     clock_t begin, end;
-    double time_spent;
+    double time_spent = 0.0;
 
 
     /* here, do your time-consuming job */
@@ -184,20 +200,15 @@ int main(){
     char outstr[80];
     int i = 0;
 
-    PPMImage images[301];
-
-    // for(i = 0; i < 301; i++) {
-    //     sprintf(instr, "infiles/baby001.ppm", i+1);
-    //     images[i] = *readPPM(instr);
-    // }
+    PPMImage images[totalFrames];
 
     PPMPixel *imageData_d, *outputData_d, *outputData_h;
     Filter3D * filter_h = initializeFilter();
 
     cudaError_t cuda_ret;
 
-    for(i = 0; i < 301; i++) {
-        sprintf(instr, "infiles/baby%03d.ppm", i+1);
+    for(i = 0; i < totalFrames - 1; i++) {
+        sprintf(instr, "../infiles/tmp%03d.ppm", i+1);
         images[i] = *readPPM(instr);
     }
 
@@ -216,14 +227,13 @@ int main(){
     outImage->x = image->x;
     outImage->y = image->y;
 
-    cudaMemcpyToSymbol(filter_c, filter_h, sizeof(Filter));
+    cudaMemcpyToSymbol(filter_c, filter_h, sizeof(Filter3D));
     cudaDeviceSynchronize();
 
 
-    begin = clock();
 
-    for(i = 0; i < 301; i++) {
-        sprintf(outstr, "outfiles/baby%03d.ppm", i+1);
+    for(i = 0; i < totalFrames-1; i++) {
+        sprintf(outstr, "../outfiles/tmp%03d.ppm", i+1);
 
         image = &images[i];
 
@@ -233,9 +243,16 @@ int main(){
         // Convolution
         const unsigned int grid_x = (image->x - 1) / OUTPUT_TILE_SIZE + 1;
         const unsigned int grid_y = (image->y -1) / OUTPUT_TILE_SIZE + 1;
-        dim3 dim_grid(grid_x, grid_y, 1);
-        dim3 dim_block(INPUT_TILE_SIZE, INPUT_TILE_SIZE, 1);
-        convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
+        const unsigned int grid_z = (FRAME_DEPTH -1) / OUTPUT_TILE_SIZE + 1;
+        dim3 dim_grid(grid_x, grid_y, grid_z);
+        dim3 dim_block(INPUT_TILE_SIZE, INPUT_TILE_SIZE, INPUT_TILE_SIZE);
+
+        begin = clock();
+
+        convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y, FRAME_DEPTH);
+
+        end = clock();
+        time_spent += (double)(end - begin) / CLOCKS_PER_SEC;
 
         cuda_ret = cudaDeviceSynchronize();
         if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel");
@@ -249,30 +266,16 @@ int main(){
         writePPM(outstr,outImage);
 
     }
-    end = clock();
 
     free(outputData_h);
     free(outImage);
     cudaFree(imageData_d);
     cudaFree(outputData_d);
 
-    // for(i = 1; i <= 1; i++) {
-        // sprintf(instr, "infiles/baby001.ppm");
-        // sprintf(outstr, "outfiles/baby001.ppm");
+    if (!system(NULL)) { exit (EXIT_FAILURE);}
+    sprintf(ffmpegString, "ffmpeg -framerate 24 -i ../outfiles/tmp%%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p ../outfilter.mp4");
+    system (ffmpegString);   
 
-        // PPMImage *image;
-        // sprintf(instr, "infiles/baby001.ppm");
-
-        // image = readPPM(instr);
-
-
-
-        // changeColorPPM(&images[i-1]);
-
-
-    // }
-
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 
     printf("%f seconds spent\n", time_spent);
 
