@@ -1,8 +1,11 @@
 #ifndef PPMH
 #define PPMH
 
-
 #define FILTER_SIZE 5
+#define CREATOR "DA BROS"
+#define RGB_COMPONENT_COLOR 255
+
+#define OUTPUT_TILE_SIZE 12
 
 typedef struct {
      unsigned char red,green,blue;
@@ -20,5 +23,8 @@ typedef struct {
      double bias;
 } Filter3D;
 
+typedef struct {
+     int x, y, z;
+} cdim3;
 
 #endif

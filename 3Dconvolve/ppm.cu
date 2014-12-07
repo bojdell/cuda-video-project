@@ -4,21 +4,6 @@
 #include "ppmKernel.cu"
 #include "ppm.h"
 
-// typedef struct {
-//      unsigned char red,green,blue;
-// } PPMPixel;
-
-// typedef struct {
-//      int x, y;
-//      PPMPixel *data;
-// } PPMImage;
-
-#define CREATOR "RPFELGUEIRAS"
-#define RGB_COMPONENT_COLOR 255
-
-#define OUTPUT_TILE_SIZE 12
-
-
 #define FATAL(msg, ...) \
     do {\
         fprintf(stderr, "[%s:%d] "msg"\n", __FILE__, __LINE__, ##__VA_ARGS__);\
@@ -136,34 +121,39 @@ Filter3D * initializeFilter()
                                                            {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} },
+
                                                          { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} },
+
                                                          { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} },
+
                                                          { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} },
+
                                                          { {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 1, 0, 0},
                                                            {0, 0, 0, 0, 0},
                                                            {0, 0, 0, 0, 0} }
                                                        };
+
     Filter3D * filter = (Filter3D*) malloc(sizeof(Filter3D));
     filter->x = FILTER_SIZE;
     filter->y = FILTER_SIZE;
     filter->z = FILTER_SIZE;
-    for (int z = 0; z < FILTER_SIZE; z++)
-        for (int y = 0; y < FILTER_SIZE; y++)
-            for (int x = 0; x < FILTER_SIZE; x++)
+    for (int z = 0; z < filter->x; z++)
+        for (int y = 0; y < filter->y; y++)
+            for (int x = 0; x < filter->z; x++)
                 filter[z][y][x] = data[z][y][x];
 
     filter->factor = 1.0;
@@ -171,25 +161,15 @@ Filter3D * initializeFilter()
     return filter;
 }
 
-int main(){
-
-
+int main() {
     clock_t begin, end;
     double time_spent;
-
-
-    /* here, do your time-consuming job */
 
     char instr[80];
     char outstr[80];
     int i = 0;
 
     PPMImage images[301];
-
-    // for(i = 0; i < 301; i++) {
-    //     sprintf(instr, "infiles/baby001.ppm", i+1);
-    //     images[i] = *readPPM(instr);
-    // }
 
     PPMPixel *imageData_d, *outputData_d, *outputData_h;
     Filter3D * filter_h = initializeFilter();
@@ -255,22 +235,6 @@ int main(){
     free(outImage);
     cudaFree(imageData_d);
     cudaFree(outputData_d);
-
-    // for(i = 1; i <= 1; i++) {
-        // sprintf(instr, "infiles/baby001.ppm");
-        // sprintf(outstr, "outfiles/baby001.ppm");
-
-        // PPMImage *image;
-        // sprintf(instr, "infiles/baby001.ppm");
-
-        // image = readPPM(instr);
-
-
-
-        // changeColorPPM(&images[i-1]);
-
-
-    // }
 
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 
