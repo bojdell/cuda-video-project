@@ -160,55 +160,49 @@ void filterPPM(PPMImage *img, Filter f)
 
     int img_x, img_y; // current pixel coordinates in the input image we are workin gon
     int f_x, f_y; // current coordinates in the filter
-    int pixel_x, pixel_y; // cur
+    int halo_x, halo_y; // current coordinates of the halo cells
 
     // loop over all pixels in image
-
     for(img_x = 0; img_x < img->x; img_x++) {
         for(img_y = 0; img_y < img->y; img_y++) {
             // accumulate red, green, and blue vals for this pixel
-
-            if(img_x >= 300) print = 0;
-            else print = 0;
-
             int red = 0, green = 0, blue = 0;
             int img_idx = img_y * img->x + img_x;
-            if(print) printf("working on pixel (%d, %d) -> (%d, %d, %d)\n", img_x, img_y, img->data[img_idx].red, img->data[img_idx].green, img->data[img_idx].blue);
 
             // loop over surrounding pixels
             for(f_x = 0; f_x < f.x; f_x++) {
                 for(f_y = 0; f_y < f.y; f_y++) {
                     // get absolute locations of surrounding pixels
-                    pixel_x = img_x + (f_x - f.x / 2);
-                    pixel_y = img_y + (f_y - f.y / 2);
+                    halo_x = img_x + (f_x - f.x / 2);
+                    halo_y = img_y + (f_y - f.y / 2);
 
-                    // check to make sure pixel_x and pixel_y are valid coordinates
-                    if(pixel_x >= 0 && pixel_x < img->x && pixel_y >= 0 && pixel_y < img->y) {
-                        int curr_red = img->data[pixel_y * img->x + pixel_x].red;
-                        int curr_green = img->data[pixel_y * img->x + pixel_x].green;
-                        int curr_blue = img->data[pixel_y * img->x + pixel_x].blue;
+                    // check to make sure halo_x and halo_y are valid coordinates
+                    if(halo_x >= 0 && halo_x < img->x && halo_y >= 0 && halo_y < img->y) {
+                        // get current color channels
+                        int curr_red = img->data[halo_y * img->x + halo_x].red;
+                        int curr_green = img->data[halo_y * img->x + halo_x].green;
+                        int curr_blue = img->data[halo_y * img->x + halo_x].blue;
+
+                        // get current kernel value
                         int fval = f.data[f_x * f.x + f_y];
 
+                        // accumulate filter * halo
                         red += curr_red * fval;
                         green += curr_green * fval;
                         blue += curr_blue * fval;
-                        
-                        if(print) printf("component from (%d, %d)[%d, %d, %d] * (%d, %d)[%d] -> (%d, %d, %d)\n", pixel_x, pixel_y, curr_red, curr_green, curr_blue, f_x, f_y, fval, red, green, blue);
                     }
                 }
             }
 
             
-            // apply filter factor and bias, and write resultant pixel back to img
+            // apply filter factor and bias, and write resultant pixel back to img (being cautious of overflow and underflow)
             new_data[img_y * img->x + img_x].red = fmin( fmax( (int)(f.factor * red + f.bias), 0), 255);
             new_data[img_y * img->x + img_x].green = fmin( fmax( (int)(f.factor * green + f.bias), 0), 255);
             new_data[img_y * img->x + img_x].blue = fmin( fmax( (int)(f.factor * blue + f.bias), 0), 255);
-
-            if(print) printf("img: %d, %d, %d\n", new_data[img_y * img->x + img_x].red, new_data[img_y * img->y + img_x].green, new_data[img_y * img->y + img_x].blue);
-            if(print) getchar();
         }
     }
 
+    // link img data to new_data
     img->data = new_data;
     
 }
@@ -256,8 +250,15 @@ double processImage(PPMImage * images, Filter f, int stride_len) {
             PPMImage * img = &images[j];
             
             begin = clock();
+#ifdef CONV
             filterPPM(img, f);
-            // colorPPM(img);
+#endif /*CONV*/
+
+#ifdef BANDW 
+            colorPPM(img);
+#endif /*BANDW*/
+
+
             end = clock();
             time_spent += ((double)(end - begin) / CLOCKS_PER_SEC);
         }
@@ -269,8 +270,6 @@ double processImage(PPMImage * images, Filter f, int stride_len) {
             sprintf(outstr, "outfiles/tmp%03d.ppm", i*stride_len + j + 1);
             writePPM(outstr, &images[j]);
         }
-
-        // freeImage(&images[j]);
     }
 
     return time_spent;
@@ -278,22 +277,22 @@ double processImage(PPMImage * images, Filter f, int stride_len) {
 
 // ppm <stride_len> (<max_frames>)
 int main(int argc, char *argv[]){
-
+    int stride_len;
     if ( argc < 2 ) /* argc should be at least 2 for correct execution */
     {
         /* We print argv[0] assuming it is the program name */
-        printf("usage: %s <stride_len> (<max_frames>)\n", argv[0]);
-        return -1;
+        printf("Using default stride length of 20 frames\n");
+       stride_len = 20;
+    } else {
+        stride_len = atoi(argv[1]);
     }
-
-    int stride_len = atoi(argv[1]);
 
     clock_t begin, end;
     double time_spent;   // time spent for each chunk, plus accumulate total at end
 
     PPMImage images[stride_len];
 
-    Filter blur = {
+    Filter edge = {
         .x = 5,
         .y = 5,
         .data = {
@@ -332,6 +331,12 @@ int main(int argc, char *argv[]){
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 
     printf("%f seconds spent\n%f seconds spent processing\n", time_spent, calc_time);
+
+    // Combine frames into a single video with ffmpeg
+    if (!system(NULL)) { exit (EXIT_FAILURE);}
+    char ffmpegString[200];
+    sprintf(ffmpegString, "ffmpeg -framerate 24 -i outfiles/tmp%%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p ./outfilter.mp4");
+    system (ffmpegString);
 
 
     return 0;

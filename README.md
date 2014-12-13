@@ -19,10 +19,27 @@ The output frames will be in the outfiles directory
 
 The output frames will be in the outfiles directory
 
-##To build and run the serial black/white and convolution
-1. make serial
 
-2. ????????????
+##To build and run serial black and white
+
+1. make serial-bw
+
+2. ./serial-bw
+
+The stride parameter defines how many frames will be read into memory from disk. It is set to 20 by default.
+
+The output frames will be in the outfiles directory and the output video will be created as outfilter.mp4
+
+##To build and run serial 2D convolution
+
+1. make serial-convolution
+
+2. ./serial-convolution [stride]
+
+The stride parameter defines how many frames will be read into memory from disk. It is set to 20 by default.
+
+The output frames will be in the outfiles directory and the output video will be created as outfilter.mp4
+
 
 ##To build and run 3D parallel convolution
 

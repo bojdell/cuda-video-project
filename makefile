@@ -20,8 +20,11 @@ convolution: convolution.o
 bandw: bandw.o
 	$(NVCC) bandw.o -o bandw $(LD_FLAGS)
 
-serial: ppm_serial.c
-	$(CC) ppm_serial.c -lm -o ppm_serial
+serial-convolution: ppm_serial.c
+	$(CC) ppm_serial.c -lm -o serial-convolution -D CONV
+
+serial-bw: ppm_serial.c
+	$(CC) ppm_serial.c -lm -o serial-bw -D BANDW
 
 clean:
-	rm -rf *.o bandw convolution ppm_serial outfiles/tmp*
+	rm -rf *.o bandw convolution serial-bw serial-convolution ppm_serial outfiles/tmp* *.mp4
