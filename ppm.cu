@@ -129,27 +129,7 @@ void writePPM(const char *filename, PPMImage *img)
     fclose(fp);
 }
 
-void changeColorPPM(PPMImage *img)
-{
-    int i;
-    if(img){
-
-         for(i=0;i<img->x*img->y;i++){
-              int avg = (img->data[i].red + img->data[i].green + img ->data[i].blue) / 3;
-
-              /*
-              img->data[i].red=RGB_COMPONENT_COLOR-img->data[i].red;
-              img->data[i].green=RGB_COMPONENT_COLOR-img->data[i].green;
-              img->data[i].blue=RGB_COMPONENT_COLOR-img->data[i].blue;
-              */
-
-              img->data[i].red = avg;
-              img->data[i].green = avg;
-              img->data[i].blue = avg;
-         }
-    }
-}
-
+// Allocates memory and initializes a filter for 2D convolution
 Filter * initializeFilter()
 {
     int data[FILTER_SIZE * FILTER_SIZE] = {0, 0, 0, 0, 0,
@@ -173,33 +153,30 @@ int main(){
     clock_t begin, end;
     double time_spent = 0.0;
 
-
-    /* here, do your time-consuming job */
-
     char instr[80];
     char outstr[80];
     int i = 0;
 
     PPMImage images[301];
 
-    // for(i = 0; i < 301; i++) {
-    //     sprintf(instr, "infiles/baby001.ppm", i+1);
-    //     images[i] = *readPPM(instr);
-    // }
-
     PPMPixel *imageData_d, *outputData_d, *outputData_h;
+    // get filter for convolution
     Filter * filter_h = initializeFilter();
 
     cudaError_t cuda_ret;
 
+    // read in 301 frames
     for(i = 0; i < 301; i++) {
         sprintf(instr, "infiles/tmp%03d.ppm", i+1);
         images[i] = *readPPM(instr);
     }
+
     PPMImage *image;
     image = &images[0];
+    // malloc space for output data on host
     outputData_h = (PPMPixel *)malloc(image->x*image->y*sizeof(PPMPixel));
 
+    // malloc space for input and output on device
     cuda_ret = cudaMalloc((void**)&(imageData_d), image->x*image->y*sizeof(PPMPixel));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory");
 
@@ -211,11 +188,11 @@ int main(){
     outImage->x = image->x;
     outImage->y = image->y;
 
+    // copy filter to constant memory on device
     cudaMemcpyToSymbol(filter_c, filter_h, sizeof(Filter));
     cudaDeviceSynchronize();
 
-
-
+    // for each of the frames run the kernel
     for(i = 0; i < 301; i++) {
         sprintf(outstr, "outfiles/tmp%03d.ppm", i+1);
 
@@ -254,10 +231,12 @@ int main(){
 
         outImage->data = outputData_h;
 
+        // write processed ppm frame to disk
         writePPM(outstr,outImage);
 
     }
 
+    // free host and device memory
     free(outputData_h);
     free(outImage);
     cudaFree(imageData_d);
