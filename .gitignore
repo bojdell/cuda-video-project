@@ -1,5 +1,3 @@
 *.o
 *.out
-infiles/*
-outfiles/*
 outfilter.mp4
