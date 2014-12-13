@@ -224,7 +224,7 @@ int main(){
         cuda_ret = cudaMemcpy(imageData_d, image->data, image->x*image->y*sizeof(PPMPixel), cudaMemcpyHostToDevice);
         if(cuda_ret != cudaSuccess) FATAL("Unable to copy to device");
 
-        // Convolution
+#ifdef CONV
         const unsigned int grid_x = (image->x - 1) / OUTPUT_TILE_SIZE + 1;
         const unsigned int grid_y = (image->y -1) / OUTPUT_TILE_SIZE + 1;
         dim3 dim_grid(grid_x, grid_y, 1);
@@ -233,12 +233,17 @@ int main(){
         convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
         end = clock();
         time_spent += (double)(end - begin) / CLOCKS_PER_SEC;
+#endif /*CONV*/
 
-        // Black and white
-        // dim dim_grid, dim_block;
-        // dim_grid = dim3(image->y, 1,1);
-        // dim_block = dim3(image->x, 1, 1);
-        // blackAndWhite<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
+#ifdef BANDW
+        dim3 dim_grid, dim_block;
+        dim_grid = dim3(image->y, 1,1);
+        dim_block = dim3(image->x, 1, 1);
+        begin = clock();
+        blackAndWhite<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y);
+        end = clock();
+        time_spent += (double)(end - begin) / CLOCKS_PER_SEC;
+#endif /*BW*/
 
         cuda_ret = cudaDeviceSynchronize();
         if(cuda_ret != cudaSuccess) FATAL("Unable to launch/execute kernel");
@@ -257,23 +262,6 @@ int main(){
     free(outImage);
     cudaFree(imageData_d);
     cudaFree(outputData_d);
-
-    // for(i = 1; i <= 1; i++) {
-        // sprintf(instr, "infiles/baby001.ppm");
-        // sprintf(outstr, "outfiles/baby001.ppm");
-
-        // PPMImage *image;
-        // sprintf(instr, "infiles/baby001.ppm");
-
-        // image = readPPM(instr);
-
-
-
-        // changeColorPPM(&images[i-1]);
-
-
-    // }
-
 
     printf("%f seconds spent\n", time_spent);
 
