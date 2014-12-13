@@ -32,6 +32,9 @@ The output frames will be in the outfiles directory
 
 3. ./par_3D_conv
 
+The output file will be in ../outfilter.mp4
+par_3D_conv takes an optional argument for an input file from ../input_videos/ (default is foreman.mp4)
+
 ##To build and run 3D serial convolution
 
 1. cd 3Dconvolution
@@ -39,9 +42,6 @@ The output frames will be in the outfiles directory
 2. make serial
 
 3. ./ser_3D_conv strideNum
-
-The output file will be in ../outfilter.mp4
-ppm takes an optional argument for an input file from ../input_videos/ (default is foreman.mp4)
 
 ##To Generate Custom Input Frames:
 
