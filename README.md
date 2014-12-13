@@ -1,78 +1,34 @@
-cuda-video-project
-==================
-
 CUDA Video Processing Project
+========================
 
-##To build and run parallel black and white
+This project utilizes parallel computing to improve the efficiency of post-processing  video footage.
 
-1. make bandw
+###How To Process A Video:
 
-2. ./bandw
+1. Find a video you want to process, and put it in `./input_videos`
 
-The output frames will be in the outfiles directory
+2. Download and install [FFmpeg](https://ffmpeg.org/)
 
-##To build and run parallel 2D convolution
+3. Use FFmpeg to break the video into frames. This code breaks off the first 20 frames of video `sample_video`:
 
-1. make convolution
+  ```
+  ffmpeg -i input_videos/sample_video.mp4 -vframes 20 infiles/tmp%03d.ppm
+  ```
 
-2. ./convolution
+4. Compile the project code
 
-The output frames will be in the outfiles directory
+ - For serial implementation (slower execution): `make serial`
+ - For parallel implementation (faster execution, requires [CUDA](https://developer.nvidia.com/cuda-downloads) and a valid GPU): `make parallel`
 
+  *Note: `make` defaults to `make parallel`*
 
-##To build and run serial black and white
+5. Run the code: 
+ - Serial: `./ppm_serial <stride_len>`
+ - Parallel: `./ppm <stride_len>`
 
-1. make serial-bw
+  Where `stride_len` is an optional parameter that can be used to control the number of frames stored in memory at one time. The default value is 20.
 
-2. ./serial-bw
-
-The stride parameter defines how many frames will be read into memory from disk. It is set to 20 by default.
-
-The output frames will be in the outfiles directory and the output video will be created as outfilter.mp4
-
-##To build and run serial 2D convolution
-
-1. make serial-convolution
-
-2. ./serial-convolution [stride]
-
-The stride parameter defines how many frames will be read into memory from disk. It is set to 20 by default.
-
-The output frames will be in the outfiles directory and the output video will be created as outfilter.mp4
-
-
-##To build and run 3D parallel convolution
-
-1. cd 3Dconvolution
-
-2. make parallel
-
-3. ./par_3D_conv
-
-The output file will be in ../outfilter.mp4
-par_3D_conv takes an optional argument for an input file from ../input_videos/ (default is foreman.mp4)
-
-##To build and run 3D serial convolution
-
-1. cd 3Dconvolution
-
-2. make serial
-
-3. ./ser_3D_conv strideNum
-
-##To Generate Custom Input Frames:
-
-1. Find a video you want to process
-
-2. Download [FFmpeg](https://ffmpeg.org/)
-
-3. Break the video into frames
-  - Use this to break off the first 20 frames of video 'sample_video':
-  '''
-  ffmpeg -i ./input_videos/sample_video.mp4 -vframes 20 ./infiles/tmp%03d.ppm
-  '''
-
-##To Generate Output Video From Frames:
-
-1. Use FFmpeg to combine the output frames into a video:
+6. Use FFmpeg to combine the output frames into a video:
+```
 ffmpeg -framerate 24 -i outfiles/tmp%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p output_video.mp4
+```
