@@ -14,6 +14,9 @@ convolution.o: ppm.cu ppmKernel.cu
 bandw.o: ppm.cu ppmKernel.cu
 	$(NVCC) -c -o bandw.o ppm.cu $(NVCC_FLAGS) -D BANDW
 
+multiFrame/ppm2DMult.o: multiFrame/ppm2DMult.cu multiFrame/ppmKernel.cu
+	$(NVCC) -c -o multiFrame/ppm2DMult.o multiFrame/ppm2DMult.cu $(LD_FLAGS)
+
 convolution: convolution.o
 	$(NVCC) convolution.o -o convolution $(LD_FLAGS)
 
@@ -25,6 +28,9 @@ serial-convolution: ppm_serial.c
 
 serial-bw: ppm_serial.c
 	$(CC) ppm_serial.c -lm -o serial-bw -D BANDW
+
+multiFrame/ppm2DMult: multiFrame/ppm2DMult.o
+	$(NVCC) multiFrame/ppm2DMult.o -o multiFrame/ppm2DMult $(LD_FLAGS)
 
 clean:
 	rm -rf *.o bandw convolution serial-bw serial-convolution ppm_serial outfiles/tmp* *.mp4

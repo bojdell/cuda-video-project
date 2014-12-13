@@ -5,20 +5,8 @@
 #include "ppmKernel.cu"
 #include "ppm.h"
 
-// typedef struct {
-//      unsigned char red,green,blue;
-// } PPMPixel;
-
-// typedef struct {
-//      int x, y;
-//      PPMPixel *data;
-// } PPMImage;
-
 #define CREATOR "RPFELGUEIRAS"
 #define RGB_COMPONENT_COLOR 255
-
-// #define OUTPUT_TILE_SIZE 12
-
 
 #define FATAL(msg, ...) \
     do {\
@@ -138,12 +126,6 @@ void changeColorPPM(PPMImage *img)
          for(i=0;i<img->x*img->y;i++){
               int avg = (img->data[i].red + img->data[i].green + img ->data[i].blue) / 3;
 
-              /*
-              img->data[i].red=RGB_COMPONENT_COLOR-img->data[i].red;
-              img->data[i].green=RGB_COMPONENT_COLOR-img->data[i].green;
-              img->data[i].blue=RGB_COMPONENT_COLOR-img->data[i].blue;
-              */
-
               img->data[i].red = avg;
               img->data[i].green = avg;
               img->data[i].blue = avg;
@@ -176,19 +158,18 @@ int main(int argc, char *argv[]){
     infile = argv[1];
 
     if (!system(NULL)) {exit (EXIT_FAILURE);}
-    system("exec rm -r infiles/*");
-    // sprintf(ffmpegString, "ffmpeg -i ../input_videos/%s -vframes 241 ../infiles/tmp%%03d.ppm", infile);
-    sprintf(ffmpegString, "ffmpeg -i input_videos/%s -f image2 -vf fps=fps=24 infiles/tmp%%03d.ppm", infile);
+    system("exec rm -r ../infiles/*");
+    sprintf(ffmpegString, "ffmpeg -i ../input_videos/%s -f image2 -vf fps=fps=24 ../infiles/tmp%%03d.ppm", infile);
     system (ffmpegString);
 
   }
-  system("exec rm -r -f outfiles/*");
+  system("exec rm -r -f ../outfiles/*");
 
   int totalFrames = 0;
   DIR * dirp;
   struct dirent * entry;
 
-  dirp = opendir("infiles"); /* There should be error handling after this */
+  dirp = opendir("../infiles"); /* There should be error handling after this */
   while ((entry = readdir(dirp)) != NULL) {
       if (entry->d_type == DT_REG) { /* If the entry is a regular file */
            totalFrames++;
@@ -210,40 +191,43 @@ int main(int argc, char *argv[]){
 
     PPMImage images[totalFrames];
 
-    // for(i = 0; i < 301; i++) {
-    //     sprintf(instr, "infiles/baby001.ppm", i+1);
-    //     images[i] = *readPPM(instr);
-    // }
-
     PPMPixel *imageData_d, *outputData_d, *outputData_h, *imageData_h;
     Filter * filter_h = initializeFilter();
 
     cudaError_t cuda_ret;
 
+    // read input frames into memory
     for(i = 0; i < totalFrames; i++) {
-        sprintf(instr, "infiles/tmp%03d.ppm", i+1);
+        sprintf(instr, "../infiles/tmp%03d.ppm", i+1);
         images[i] = *readPPM(instr);
     }
     PPMImage *image;
     image = &images[0];
+
+    // malloc host memory
     outputData_h = (PPMPixel *)malloc(IMAGES_PER_BLOCK*image->x*image->y*sizeof(PPMPixel));
     imageData_h = (PPMPixel *)malloc(IMAGES_PER_BLOCK*image->x*image->y*sizeof(PPMPixel));
 
+    // malloc device memory
     cuda_ret = cudaMalloc((void**)&(imageData_d),IMAGES_PER_BLOCK*image->x*image->y*sizeof(PPMPixel));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory");
 
     cuda_ret = cudaMalloc((void**)&(outputData_d),IMAGES_PER_BLOCK*image->x*image->y*sizeof(PPMPixel));
     if(cuda_ret != cudaSuccess) FATAL("Unable to allocate device memory");
 
+    // set the output image's properties
     PPMImage *outImage;
     outImage = (PPMImage *)malloc(sizeof(PPMImage));
     outImage->x = image->x;
     outImage->y = image->y;
 
+    //setup shared memory
     cudaMemcpyToSymbol(filter_c, filter_h, sizeof(Filter));
     cudaDeviceSynchronize();
 
     for(i = 0; i < totalFrames; i+=IMAGES_PER_BLOCK) {
+
+        // load IMAGES_PER_BLOCk images into a flat pixel array
         for(int x = 0; x < IMAGES_PER_BLOCK; x++) {
           if(i+x < totalFrames) {
             image = &images[i+x];
@@ -253,6 +237,7 @@ int main(int argc, char *argv[]){
           }
         }
 
+      // copy the image data to the device
       cuda_ret = cudaMemcpy(imageData_d, imageData_h, IMAGES_PER_BLOCK*image->x*image->y*sizeof(PPMPixel), cudaMemcpyHostToDevice);
       if(cuda_ret != cudaSuccess) FATAL("Unable to copy to device");
 
@@ -261,12 +246,11 @@ int main(int argc, char *argv[]){
       const unsigned int grid_y = (image->y -1) / OUTPUT_TILE_SIZE + 1;
       dim3 dim_grid(grid_x, grid_y, 1);
       dim3 dim_block(INPUT_TILE_SIZE, INPUT_TILE_SIZE, 1);
+      
       begin = clock();
-      // if(i+IMAGES_PER_BLOCK > totalFrames) {
-      //   convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y, totalFrames - i);        
-      // } else {
+
+      // Convolution
       convolution<<<dim_grid, dim_block>>>(imageData_d, outputData_d, image->x, image->y, IMAGES_PER_BLOCK);        
-      // }
 
       // Black and white
       // dim3 dim_grid, dim_block;
@@ -279,21 +263,19 @@ int main(int argc, char *argv[]){
       end = clock();
       time_spent += (double)(end - begin) / CLOCKS_PER_SEC;
 
+      // the processed image data from device 
       cuda_ret = cudaMemcpy(outputData_h, outputData_d,IMAGES_PER_BLOCK*image->x*image->y*sizeof(PPMPixel), cudaMemcpyDeviceToHost);
       if(cuda_ret != cudaSuccess) FATAL("Unable to copy to host");
 
-
-      // outImage->data = outputData_h;
+      // extract processed image data from the flattened array and write the image to disk
       for(int x = 0; x < IMAGES_PER_BLOCK; x++) {
         if(i+x < totalFrames) {
-          sprintf(outstr, "outfiles/tmp%03d.ppm", i+x+1);
+          sprintf(outstr, "../outfiles/tmp%03d.ppm", i+x+1);
           outImage->data = &(outputData_h[x*image->x*image->y]);
           writePPM(outstr,outImage);
 
         }
       }
-      // writePPM(outstr,outImage);
-
     }
 
     free(outputData_h);
@@ -301,26 +283,10 @@ int main(int argc, char *argv[]){
     cudaFree(imageData_d);
     cudaFree(outputData_d);
 
-    // for(i = 1; i <= 1; i++) {
-        // sprintf(instr, "infiles/baby001.ppm");
-        // sprintf(outstr, "outfiles/baby001.ppm");
-
-        // PPMImage *image;
-        // sprintf(instr, "infiles/baby001.ppm");
-
-        // image = readPPM(instr);
-
-
-
-        // changeColorPPM(&images[i-1]);
-
-
-    // }
-
 
 
     if (!system(NULL)) { exit (EXIT_FAILURE);}
-    sprintf(ffmpegString, "ffmpeg -framerate 24 -i outfiles/tmp%%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p outfilter.mp4");
+    sprintf(ffmpegString, "ffmpeg -framerate 24 -i ../outfiles/tmp%%03d.ppm -c:v libx264 -r 30 -pix_fmt yuv420p outfilter.mp4");
     system (ffmpegString);
 
     printf("%f seconds spent\n", time_spent);
