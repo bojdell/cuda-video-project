@@ -24,4 +24,4 @@ serial: ppm_serial.c
 	$(CC) ppm_serial.c -lm -o ppm_serial
 
 clean:
-	rm -rf *.o bandw convolution ppm_serial
+	rm -rf *.o bandw convolution ppm_serial outfiles/tmp*

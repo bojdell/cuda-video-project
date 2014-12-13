@@ -24,13 +24,21 @@ The output frames will be in the outfiles directory
 
 2. ????????????
 
-##To build and run 3D convolution
+##To build and run 3D parallel convolution
 
 1. cd 3Dconvolution
 
-2. make
+2. make parallel
 
-3. ./ppm
+3. ./par_3D_conv
+
+##To build and run 3D serial convolution
+
+1. cd 3Dconvolution
+
+2. make serial
+
+3. ./ser_3D_conv strideNum
 
 The output file will be in ../outfilter.mp4
 ppm takes an optional argument for an input file from ../input_videos/ (default is foreman.mp4)
