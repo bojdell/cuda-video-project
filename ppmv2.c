@@ -151,14 +151,16 @@ int print = 0;
 // filter a single PPM image
 void filterPPM(PPMImage *img, Filter f)
 {
-    if(!img)
+    if(!img) // return if we don't have a valid image to work on
         return;
 
+    // creating a new output image since we can't "contaminate" the input by overwriting
+    // with the output
     PPMPixel * new_data = (PPMPixel*)malloc(img->x * img->y * sizeof(PPMPixel));
 
-    int img_x, img_y;
-    int f_x, f_y;
-    int pixel_x, pixel_y;
+    int img_x, img_y; // current pixel coordinates in the input image we are workin gon
+    int f_x, f_y; // current coordinates in the filter
+    int pixel_x, pixel_y; // cur
 
     // loop over all pixels in image
 
