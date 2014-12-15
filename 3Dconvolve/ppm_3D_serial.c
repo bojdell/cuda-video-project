@@ -15,6 +15,7 @@ void freeImage(PPMImage ** image) {
     }
 }
 
+// TODO: allocate memory outside of readPPM
 static PPMImage *readPPM(const char *filename)
 {
      char buff[16];
@@ -94,6 +95,7 @@ static PPMImage *readPPM(const char *filename)
     return img;
 }
 
+// TODO: allocate memory outside of writePPM
 void writePPM(const char *filename, PPMImage *img)
 {
     FILE *fp;
@@ -225,7 +227,7 @@ double processImages(PPMImage ** images, Filter3D f, cdim3 stride, PPMImage ** n
     double time_spent = -1.0;
     clock_t begin, end;
 
-    int numFrames = 50;    // max # frames
+    int numFrames = 301;    // max # frames
     // PPMImage * new_images[stride.z];  // TODO
 
     // calculate number of chunks in each dimension
@@ -332,43 +334,43 @@ int main(int argc, char *argv[]) {
         .bias = 0
     };
 
-    // Filter3D sobel2 = {
-    //     .x = 5,
-    //     .y = 5,
-    //     .z = 5,
-    //     .data =    { { {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0} },
+    Filter3D sobel2 = {
+        .x = 5,
+        .y = 5,
+        .z = 5,
+        .data =    { { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} },
 
-    //                  { {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0} },
+                     { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} },
 
-    //                  { {0, 0, 0, 0, 0},
-    //                    {0, 1, 0, -1, 0},
-    //                    {0, 2, 0, -2, 0},
-    //                    {0, 1, 0, -1, 0},
-    //                    {0, 0, 0, 0, 0} },
+                     { {0, 0, 0, 0, 0},
+                       {0, 1, 0, -1, 0},
+                       {0, 2, 0, -2, 0},
+                       {0, 1, 0, -1, 0},
+                       {0, 0, 0, 0, 0} },
 
-    //                  { {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0} },
+                     { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} },
 
-    //                  { {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0},
-    //                    {0, 0, 0, 0, 0} }
-    //                },
-    //     .factor = 1,
-    //     .bias = 0
-    // };
+                     { {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0} }
+                   },
+        .factor = 1,
+        .bias = 0
+    };
 
     Filter3D motion_blur = {
         .x = 5,
@@ -408,7 +410,7 @@ int main(int argc, char *argv[]) {
         .bias = 0
     };
 
-    Filter3D f = motion_blur;
+    Filter3D f = sobel;
 
     // create space for video frames (including padding)
     PPMImage * images[stride_len + f.z - 1];
