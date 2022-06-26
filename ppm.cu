@@ -20,10 +20,8 @@
 
 
 #define FATAL(msg, ...) \
-    do {\
-        fprintf(stderr, "[%s:%d] "msg"\n", __FILE__, __LINE__, ##__VA_ARGS__);\
-        exit(-1);\
-    } while(0)
+    fprintf(stderr, "[%s:%d] " msg "\n", __FILE__, __LINE__, ##__VA_ARGS__);\
+    exit(-1);\
 
 static PPMImage *readPPM(const char *filename)
 {
